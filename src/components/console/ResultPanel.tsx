@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { QueryResult } from "@/datasource/types";
 import { useAppState } from "@/store/appState";
+import { ResultExportBar } from "@/components/console/ResultExportBar";
 import { ResultGrid } from "@/components/console/ResultGrid";
 
 function EmptyHint({ children }: { children: ReactNode }) {
@@ -32,6 +33,7 @@ function GridWithBanners({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
+      <ResultExportBar result={result} />
       {result.truncated && (
         <div className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 flex shrink-0 items-center gap-1.5 border-b px-3 py-1 text-xs">
           <span>⚠</span>
