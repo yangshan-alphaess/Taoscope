@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  CornerDownLeft,
   Database as DbIcon,
   FileText,
   Layers,
@@ -12,8 +13,23 @@ import {
 } from "lucide-react";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
+import * as editorBridge from "@/components/console/editorBridge";
 import type { Column, Database, STable, Table } from "@/datasource/types";
 import { cn } from "@/lib/utils";
+
+function InsertButton({ name }: { name: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => editorBridge.insert(name)}
+      title={`Insert "${name}"`}
+      aria-label={`Insert ${name}`}
+      className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-0.5 group-hover:visible"
+    >
+      <CornerDownLeft className="h-3 w-3" />
+    </button>
+  );
+}
 
 const CHILD_PAGE_SIZE = 50;
 
@@ -361,19 +377,22 @@ export function SchemaPanel() {
                             const child = children[stb.name];
                             return (
                               <div key={stb.name}>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleColumns(stb.name)}
-                                  className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-                                >
-                                  <Layers className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="truncate" title={stb.name}>
-                                    {highlight(stb.name, query)}
-                                  </span>
-                                  <span className="text-muted-foreground/70 ml-auto font-mono">
-                                    STable · {stb.childCount}
-                                  </span>
-                                </button>
+                                <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground relative flex w-full items-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleColumns(stb.name)}
+                                    className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+                                  >
+                                    <Layers className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate" title={stb.name}>
+                                      {highlight(stb.name, query)}
+                                    </span>
+                                    <span className="text-muted-foreground/70 ml-auto font-mono">
+                                      STable · {stb.childCount}
+                                    </span>
+                                  </button>
+                                  <InsertButton name={stb.name} />
+                                </div>
                                 {colsOpen && (
                                   <ColumnDetail
                                     state={colsState}
@@ -414,17 +433,20 @@ export function SchemaPanel() {
                             const colsState = tableColumns[t.name];
                             return (
                               <div key={t.name}>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleColumns(t.name)}
-                                  className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-                                >
-                                  <span className="w-3 shrink-0" aria-hidden />
-                                  <FileText className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="truncate" title={t.name}>
-                                    {highlight(t.name, query)}
-                                  </span>
-                                </button>
+                                <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground relative flex w-full items-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleColumns(t.name)}
+                                    className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+                                  >
+                                    <span className="w-3 shrink-0" aria-hidden />
+                                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate" title={t.name}>
+                                      {highlight(t.name, query)}
+                                    </span>
+                                  </button>
+                                  <InsertButton name={t.name} />
+                                </div>
                                 {open && (
                                   <ColumnDetail
                                     state={colsState}
@@ -494,7 +516,7 @@ function ColumnDetail({
         visible.map((c) => (
           <div
             key={c.name}
-            className="flex items-center gap-2 px-3 py-0.5 text-[10px]"
+            className="group hover:bg-muted/40 flex items-center gap-2 px-3 py-0.5 text-[10px]"
           >
             <span
               className="text-foreground font-mono truncate"
@@ -505,6 +527,7 @@ function ColumnDetail({
             <span className="text-muted-foreground/70 ml-auto font-mono">
               {formatType(c)}
             </span>
+            <InsertButton name={c.name} />
           </div>
         ))
       )}
@@ -552,10 +575,12 @@ function ChildList({
         visible.map((t) => (
           <div
             key={t.name}
-            className="text-muted-foreground px-3 py-0.5 font-mono text-xs"
+            className="group text-muted-foreground hover:bg-muted/40 flex items-center px-3 py-0.5 font-mono text-xs"
             title={t.name}
           >
-            {highlight(t.name, query)}
+            <span className="truncate">{highlight(t.name, query)}</span>
+            <span className="ml-auto" />
+            <InsertButton name={t.name} />
           </div>
         ))
       )}

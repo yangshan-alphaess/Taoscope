@@ -8,6 +8,7 @@ import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { bracketMatching, indentOnInput } from "@codemirror/language";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
+import * as editorBridge from "./editorBridge";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 import { taoscopeEditorExtensions, taoscopeEditorTheme } from "./sqlEditorTheme";
 import { createSqlCompletionSource } from "./sqlCompletionSource";
@@ -49,6 +50,21 @@ export function Editor() {
       }),
     [ds],
   );
+
+  const viewRef = useRef<EditorView | null>(null);
+  const handleCreateEditor = (view: EditorView) => {
+    viewRef.current = view;
+    editorBridge.register((text) => {
+      view.dispatch(view.state.replaceSelection(text));
+      view.focus();
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      editorBridge.unregister();
+    };
+  }, []);
 
   // Track which console ids have been hydration-started this session to
   // avoid double-fetching during re-renders.
@@ -143,6 +159,7 @@ export function Editor() {
       <CodeMirror
         value={runtime.scratch}
         onChange={(v) => setScratch(activeConsoleId, v)}
+        onCreateEditor={handleCreateEditor}
         height="100%"
         theme={taoscopeEditorTheme}
         extensions={extensions}
