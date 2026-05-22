@@ -1,60 +1,17 @@
 import { Play, Square, WandSparkles } from "lucide-react";
-import { useDataSource } from "@/datasource/context";
-import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
+import { useRunActiveConsole } from "./useRunActiveConsole";
 
 export function Toolbar() {
-  const ds = useDataSource();
-  const activeConsoleId = useAppState((s) => s.activeConsoleId);
-  const activeConsole = useAppState((s) =>
-    activeConsoleId
-      ? (s.consoles.find((c) => c.id === activeConsoleId) ?? null)
-      : null,
-  );
-  const connection = useAppState((s) =>
-    activeConsole
-      ? (s.connections.find((c) => c.id === activeConsole.connectionId) ?? null)
-      : null,
-  );
-  const runtime = useAppState((s) =>
-    activeConsoleId ? s.consoleRuntime[activeConsoleId] : undefined,
-  );
-  const setRunStarted = useAppState((s) => s.setRunStarted);
-  const setRunOk = useAppState((s) => s.setRunOk);
-  const setRunError = useAppState((s) => s.setRunError);
-
-  const canRun =
-    !!activeConsoleId &&
-    !!activeConsole &&
-    !!connection &&
-    connection.status === "online" &&
-    runtime?.execStatus !== "running";
-
-  const running = runtime?.execStatus === "running";
-
-  async function handleRun() {
-    if (!canRun || !activeConsole || !connection || !activeConsoleId) return;
-    const id = activeConsoleId;
-    const scratch = runtime?.scratch ?? "";
-    setRunStarted(id);
-    try {
-      const r = await ds.runSql(connection.id, activeConsole.currentDb, scratch);
-      setRunOk(id, r);
-      // Fire-and-forget persistence.
-      void ds.saveResult(id, r);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setRunError(id, message);
-    }
-  }
+  const { canRun, isRunning, run } = useRunActiveConsole();
 
   return (
     <div className="border-border bg-background flex h-9 shrink-0 items-center gap-1 border-b px-2">
       <ToolbarButton
-        onClick={handleRun}
+        onClick={run}
         disabled={!canRun}
         icon={<Play className="h-3.5 w-3.5" />}
-        label={running ? "Running…" : "Run"}
+        label={isRunning ? "Running…" : "Run"}
         primary
       />
       <ToolbarButton
