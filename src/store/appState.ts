@@ -3,11 +3,22 @@ import type { Connection, Console, QueryResult } from "@/datasource/types";
 
 export type ExecStatus = "idle" | "running" | "ok" | "error";
 
+export interface GridState {
+  sorting: { id: string; desc: boolean }[];
+  columnSizing: Record<string, number>;
+}
+
+const DEFAULT_GRID_STATE: GridState = {
+  sorting: [],
+  columnSizing: {},
+};
+
 export interface ConsoleRuntimeEntry {
   scratch: string;
   lastResult: QueryResult | null;
   execStatus: ExecStatus;
   execError: string | null;
+  gridState: GridState;
 }
 
 const DEFAULT_RUNTIME: ConsoleRuntimeEntry = {
@@ -15,6 +26,7 @@ const DEFAULT_RUNTIME: ConsoleRuntimeEntry = {
   lastResult: null,
   execStatus: "idle",
   execError: null,
+  gridState: DEFAULT_GRID_STATE,
 };
 
 interface AppState {
@@ -55,6 +67,7 @@ interface AppState {
   setRunStarted: (id: string) => void;
   setRunOk: (id: string, result: QueryResult) => void;
   setRunError: (id: string, message: string) => void;
+  setGridState: (id: string, state: GridState) => void;
 }
 
 /** Pick a neighbor id in the openConsoleIds list when closing/deleting `id`. */
@@ -176,6 +189,7 @@ export const useAppState = create<AppState>((set) => ({
             execStatus: "ok",
             execError: null,
             lastResult: result,
+            gridState: DEFAULT_GRID_STATE,
           },
         },
       };
@@ -187,6 +201,17 @@ export const useAppState = create<AppState>((set) => ({
         consoleRuntime: {
           ...state.consoleRuntime,
           [id]: { ...prev, execStatus: "error", execError: message },
+        },
+      };
+    }),
+  setGridState: (id, gridState) =>
+    set((state) => {
+      const prev = state.consoleRuntime[id];
+      if (!prev) return state;
+      return {
+        consoleRuntime: {
+          ...state.consoleRuntime,
+          [id]: { ...prev, gridState },
         },
       };
     }),

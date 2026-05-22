@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -8,14 +8,27 @@ import {
   type ColumnSizingState,
   type SortingFnOption,
   type SortingState,
+  type Updater,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 import type { Column, QueryResult } from "@/datasource/types";
 import { cn } from "@/lib/utils";
+import { useAppState } from "@/store/appState";
 import { formatCell, isNumericColumn } from "@/components/console/formatCell";
 import { ResultCell } from "@/components/console/ResultCell";
+
+const EMPTY_GRID_STATE = {
+  sorting: [] as SortingState,
+  columnSizing: {} as ColumnSizingState,
+};
+
+function resolveUpdater<T>(updater: Updater<T>, prev: T): T {
+  return typeof updater === "function"
+    ? (updater as (p: T) => T)(prev)
+    : updater;
+}
 
 type Row = unknown[];
 
@@ -100,13 +113,12 @@ function buildColumnDefs(columns: Column[]): ColumnDef<Row>[] {
 }
 
 export function ResultGrid({ result }: { result: QueryResult }) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-
-  useEffect(() => {
-    setSorting([]);
-    setColumnSizing({});
-  }, [result]);
+  const activeId = useAppState((s) => s.activeConsoleId);
+  const gridState =
+    useAppState((s) =>
+      activeId ? s.consoleRuntime[activeId]?.gridState : undefined,
+    ) ?? EMPTY_GRID_STATE;
+  const setGridState = useAppState((s) => s.setGridState);
 
   const columns = useMemo(
     () => buildColumnDefs(result.columns),
@@ -120,9 +132,20 @@ export function ResultGrid({ result }: { result: QueryResult }) {
     getSortedRowModel: getSortedRowModel(),
     enableColumnResizing: true,
     columnResizeMode: "onChange",
-    state: { sorting, columnSizing },
-    onSortingChange: setSorting,
-    onColumnSizingChange: setColumnSizing,
+    state: {
+      sorting: gridState.sorting,
+      columnSizing: gridState.columnSizing,
+    },
+    onSortingChange: (updater) => {
+      if (!activeId) return;
+      const next = resolveUpdater(updater, gridState.sorting);
+      setGridState(activeId, { ...gridState, sorting: next });
+    },
+    onColumnSizingChange: (updater) => {
+      if (!activeId) return;
+      const next = resolveUpdater(updater, gridState.columnSizing);
+      setGridState(activeId, { ...gridState, columnSizing: next });
+    },
   });
 
   const parentRef = useRef<HTMLDivElement>(null);
