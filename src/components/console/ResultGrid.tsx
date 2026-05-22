@@ -15,6 +15,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { Column, QueryResult } from "@/datasource/types";
 import { cn } from "@/lib/utils";
 import { formatCell, isNumericColumn } from "@/components/console/formatCell";
+import { ResultCell } from "@/components/console/ResultCell";
 
 type Row = unknown[];
 
@@ -224,24 +225,14 @@ export function ResultGrid({ result }: { result: QueryResult }) {
                   );
                   const numeric = col ? isNumericColumn(col) : false;
                   return (
-                    <td
+                    <ResultCell
                       key={cell.id}
-                      className={cn(
-                        "border-border/30 flex items-center overflow-hidden border-r px-2 text-xs whitespace-nowrap last:border-r-0",
-                        numeric && "justify-end text-right tabular-nums",
-                      )}
-                      style={{
-                        width: cell.column.getSize(),
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span className="overflow-hidden text-ellipsis">
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </span>
-                    </td>
+                      cell={cell}
+                      col={col}
+                      row={row.original}
+                      columns={result.columns}
+                      numeric={numeric}
+                    />
                   );
                 })}
               </tr>
