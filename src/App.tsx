@@ -9,6 +9,7 @@ import { MainArea } from "@/components/layout/MainArea";
 import { StatusBar } from "@/components/layout/StatusBar";
 import { ConsolesPanel } from "@/components/console/ConsolesPanel";
 import { ResultPanel } from "@/components/console/ResultPanel";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   // Single mock instance, lifetime = app lifetime.
@@ -45,6 +46,7 @@ function App() {
           </div>
         </div>
         <StatusBar />
+        <Toaster richColors position="bottom-right" />
       </div>
     </DataSourceProvider>
   );

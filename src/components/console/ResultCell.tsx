@@ -1,5 +1,6 @@
 import type { Cell } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
+import { toast } from "sonner";
 
 import type { Column } from "@/datasource/types";
 import { cn } from "@/lib/utils";
@@ -26,8 +27,17 @@ interface ResultCellProps {
   numeric: boolean;
 }
 
-function writeClipboard(text: string): void {
-  navigator.clipboard.writeText(text).catch(() => {});
+function previewValue(s: string): string {
+  if (s === "") return "(empty)";
+  if (s.length > 30) return `${s.slice(0, 30)}…`;
+  return s;
+}
+
+function copyWithToast(text: string, successLabel: string): void {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => toast.success(successLabel))
+    .catch(() => toast.error("Failed to copy"));
 }
 
 export function ResultCell({
@@ -38,6 +48,26 @@ export function ResultCell({
   numeric,
 }: ResultCellProps) {
   const value = cell.getValue();
+
+  function handleCopyValue() {
+    const text = col ? serializeValue(value, col) : String(value ?? "");
+    const preview = previewValue(text);
+    const label = preview === "(empty)" ? "Copied (empty)" : `Copied "${preview}"`;
+    copyWithToast(text, label);
+  }
+
+  function handleCopyTsv() {
+    copyWithToast(rowToTsv(row, columns), "Copied row");
+  }
+
+  function handleCopyJson() {
+    copyWithToast(rowToJson(row, columns), "Copied row as JSON");
+  }
+
+  function handleCopyColumnName() {
+    if (!col) return;
+    copyWithToast(col.name, `Copied "${col.name}"`);
+  }
 
   return (
     <ContextMenu>
@@ -58,28 +88,17 @@ export function ResultCell({
         </td>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem
-          onSelect={() =>
-            writeClipboard(col ? serializeValue(value, col) : String(value ?? ""))
-          }
-        >
+        <ContextMenuItem onSelect={handleCopyValue}>
           Copy value
         </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => writeClipboard(rowToTsv(row, columns))}
-        >
+        <ContextMenuItem onSelect={handleCopyTsv}>
           Copy row as TSV
         </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => writeClipboard(rowToJson(row, columns))}
-        >
+        <ContextMenuItem onSelect={handleCopyJson}>
           Copy row as JSON
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          onSelect={() => writeClipboard(col?.name ?? "")}
-          disabled={!col}
-        >
+        <ContextMenuItem onSelect={handleCopyColumnName} disabled={!col}>
           Copy column name
         </ContextMenuItem>
       </ContextMenuContent>
