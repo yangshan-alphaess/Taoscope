@@ -10,6 +10,8 @@ import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 import { taoscopeEditorExtensions, taoscopeEditorTheme } from "./sqlEditorTheme";
+import { createSqlCompletionSource } from "./sqlCompletionSource";
+import { useEditorSchemaContext } from "./useEditorSchemaContext";
 
 const SCRATCH_DEBOUNCE_MS = 400;
 
@@ -27,6 +29,26 @@ export function Editor() {
   useEffect(() => {
     runRef.current = run;
   }, [run]);
+
+  const schemaCtx = useEditorSchemaContext();
+  const editorCtxRef = useRef<{ connectionId: string | null; db: string | null }>(
+    { connectionId: schemaCtx.connectionId, db: schemaCtx.db },
+  );
+  useEffect(() => {
+    editorCtxRef.current = {
+      connectionId: schemaCtx.connectionId,
+      db: schemaCtx.db,
+    };
+  }, [schemaCtx.connectionId, schemaCtx.db]);
+
+  const sqlSource = useMemo(
+    () =>
+      createSqlCompletionSource({
+        ds,
+        getContext: () => editorCtxRef.current,
+      }),
+    [ds],
+  );
 
   // Track which console ids have been hydration-started this session to
   // avoid double-fetching during re-renders.
@@ -68,9 +90,11 @@ export function Editor() {
     return () => window.clearTimeout(handle);
   }, [ds, activeConsoleId, runtime]);
 
-  const extensions = useMemo(
-    () => [
-      sql({ dialect: MySQL }),
+  const extensions = useMemo(() => {
+    const sqlExt = sql({ dialect: MySQL });
+    return [
+      sqlExt,
+      sqlExt.language.data.of({ autocomplete: sqlSource }),
       history(),
       bracketMatching(),
       indentOnInput(),
@@ -93,9 +117,8 @@ export function Editor() {
         },
       ]),
       ...taoscopeEditorExtensions,
-    ],
-    [],
-  );
+    ];
+  }, [sqlSource]);
 
   if (!activeConsoleId) {
     return (
