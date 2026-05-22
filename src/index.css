@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light theme tokens (kept as fallback; app defaults to dark). */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+
+    --primary: 164 93% 34%; /* #06A77D */
+    --primary-foreground: 0 0% 100%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 164 93% 34%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Linear/Vercel-ish dark theme. Background slightly cool, low contrast neutrals. */
+    --background: 240 6% 7%;
+    --foreground: 240 5% 96%;
+
+    --card: 240 6% 9%;
+    --card-foreground: 240 5% 96%;
+
+    --primary: 164 93% 38%; /* slightly brighter #06A77D for dark bg */
+    --primary-foreground: 240 6% 7%;
+
+    --muted: 240 5% 14%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 240 5% 14%;
+    --accent-foreground: 240 5% 96%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5% 16%;
+    --input: 240 5% 16%;
+    --ring: 164 93% 38%;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    overflow: hidden; /* desktop app: never scroll the window itself */
+  }
+}
