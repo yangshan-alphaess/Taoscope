@@ -41,9 +41,19 @@ export interface Connection {
   host: string;
   port: number;
   user: string;
+  password: string;
   /** Optional color label for visual disambiguation between connections. */
   color?: string;
   status: "online" | "offline";
+}
+
+export interface ConnectionInput {
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  color?: string;
 }
 
 export interface Database {
@@ -127,6 +137,10 @@ export interface CreateConsoleInput {
 export interface DataSource {
   listConnections(): Promise<Connection[]>;
   testConnection(connId: string): Promise<TestConnectionResult>;
+  createConnection(input: ConnectionInput): Promise<Connection>;
+  updateConnection(id: string, input: ConnectionInput): Promise<void>;
+  deleteConnection(id: string): Promise<void>;
+  testConnectionConfig(input: ConnectionInput): Promise<TestConnectionResult>;
 
   listDatabases(connId: string): Promise<Database[]>;
   listSTables(connId: string, db: string): Promise<STable[]>;

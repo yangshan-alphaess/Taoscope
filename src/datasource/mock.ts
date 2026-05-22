@@ -9,6 +9,7 @@ import { nanoid } from "nanoid";
 import type {
   Column,
   Connection,
+  ConnectionInput,
   Console,
   CreateConsoleInput,
   Database,
@@ -24,6 +25,7 @@ import type {
 const SCRATCH_KEY_PREFIX = "taoscope.scratch.";
 const CONSOLES_KEY = "taoscope.consoles";
 const RESULT_KEY_PREFIX = "taoscope.result.";
+const CONNECTIONS_KEY = "taoscope.connections";
 
 /** Yield to the microtask queue so callers always see real async behavior. */
 const tick = () => Promise.resolve();
@@ -36,32 +38,62 @@ interface FixtureSchema {
   tables: Record<string, Table[]>;
 }
 
-const CONNECTIONS: Connection[] = [
+type SeedConnection = Omit<Connection, "id">;
+
+const SEED_CONNECTIONS: SeedConnection[] = [
   {
-    id: "prod-shanghai",
     name: "prod-shanghai",
     host: "192.168.10.20",
     port: 6041,
     user: "root",
+    password: "",
     status: "online",
   },
   {
-    id: "staging-bj",
     name: "staging-bj",
     host: "10.0.3.15",
     port: 6041,
     user: "dev",
+    password: "",
     status: "online",
   },
   {
-    id: "dev-local",
     name: "dev-local",
     host: "127.0.0.1",
     port: 6041,
     user: "root",
+    password: "",
     status: "offline",
   },
 ];
+
+function loadConnectionsFromStorage(): Connection[] | null {
+  try {
+    const raw = localStorage.getItem(CONNECTIONS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const valid = parsed.every(
+      (c): c is Connection =>
+        typeof c === "object" &&
+        c !== null &&
+        typeof c.id === "string" &&
+        typeof c.name === "string" &&
+        typeof c.host === "string",
+    );
+    return valid ? (parsed as Connection[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistConnections(list: Connection[]): void {
+  try {
+    localStorage.setItem(CONNECTIONS_KEY, JSON.stringify(list));
+  } catch {
+    // ignore
+  }
+}
 
 const METERS: STable = {
   name: "meters",
@@ -189,15 +221,43 @@ function buildDemoRows(n = 10): unknown[][] {
   return rows;
 }
 
+function isLanHost(host: string): boolean {
+  return (
+    /^192\.168\./.test(host) ||
+    /^10\./.test(host) ||
+    host === "127.0.0.1" ||
+    host === "localhost"
+  );
+}
+
 export class MockDataSource implements DataSource {
+  private _connections: Connection[];
+
+  constructor() {
+    const stored = loadConnectionsFromStorage();
+    if (stored) {
+      this._connections = stored;
+    } else {
+      this._connections = SEED_CONNECTIONS.map((c) => ({
+        id: nanoid(),
+        ...c,
+      }));
+      persistConnections(this._connections);
+    }
+  }
+
+  private persist(): void {
+    persistConnections(this._connections);
+  }
+
   async listConnections(): Promise<Connection[]> {
     await tick();
-    return CONNECTIONS.map((c) => ({ ...c }));
+    return this._connections.map((c) => ({ ...c }));
   }
 
   async testConnection(connId: string): Promise<TestConnectionResult> {
     await tick();
-    const conn = CONNECTIONS.find((c) => c.id === connId);
+    const conn = this._connections.find((c) => c.id === connId);
     if (!conn) {
       return { ok: false, message: `Unknown connection: ${connId}` };
     }
@@ -207,9 +267,77 @@ export class MockDataSource implements DataSource {
     return { ok: true };
   }
 
+  async createConnection(input: ConnectionInput): Promise<Connection> {
+    await tick();
+    const name = input.name.trim();
+    if (this._connections.some((c) => c.name === name)) {
+      throw new Error("Connection name already exists");
+    }
+    const created: Connection = {
+      id: nanoid(),
+      name,
+      host: input.host,
+      port: input.port,
+      user: input.user,
+      password: input.password,
+      color: input.color,
+      status: "online",
+    };
+    this._connections.push(created);
+    this.persist();
+    return { ...created };
+  }
+
+  async updateConnection(id: string, input: ConnectionInput): Promise<void> {
+    await tick();
+    const idx = this._connections.findIndex((c) => c.id === id);
+    if (idx === -1) throw new Error(`Connection not found: ${id}`);
+    const name = input.name.trim();
+    if (this._connections.some((c) => c.id !== id && c.name === name)) {
+      throw new Error("Connection name already exists");
+    }
+    const prev = this._connections[idx]!;
+    this._connections[idx] = {
+      ...prev,
+      name,
+      host: input.host,
+      port: input.port,
+      user: input.user,
+      password: input.password,
+      color: input.color,
+    };
+    this.persist();
+  }
+
+  async deleteConnection(id: string): Promise<void> {
+    await tick();
+    const next = this._connections.filter((c) => c.id !== id);
+    if (next.length === this._connections.length) return;
+    this._connections = next;
+    this.persist();
+  }
+
+  async testConnectionConfig(
+    input: ConnectionInput,
+  ): Promise<TestConnectionResult> {
+    const delay = randomInt(300, 800);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    const host = input.host.trim();
+    if (host === "" || input.port < 1 || input.port > 65535) {
+      return { ok: false, message: "Invalid host or port" };
+    }
+    if (isLanHost(host)) {
+      if (Math.random() < 0.5) {
+        return { ok: false, message: "ECONNREFUSED (mock LAN intermittent)" };
+      }
+      return { ok: true };
+    }
+    return { ok: true };
+  }
+
   async listDatabases(connId: string): Promise<Database[]> {
     await tick();
-    const conn = CONNECTIONS.find((c) => c.id === connId);
+    const conn = this._connections.find((c) => c.id === connId);
     if (!conn || conn.status === "offline") return [];
     return ONLINE_SCHEMA.databases.map((d) => ({ ...d }));
   }
