@@ -1,27 +1,44 @@
 import { Settings, Maximize2 } from "lucide-react";
+import { useAppState } from "@/store/appState";
+import { cn } from "@/lib/utils";
 
 export function TitleBar() {
+  const connections = useAppState((s) => s.connections);
+  const currentConnectionId = useAppState((s) => s.currentConnectionId);
+
+  const currentConn =
+    connections.find((c) => c.id === currentConnectionId) ?? null;
+
   return (
     <div
       data-tauri-drag-region
       className="bg-background border-border flex h-10 shrink-0 items-center border-b px-4 pl-20 select-none"
     >
       {/* pl-20 reserves space for macOS traffic lights on the left */}
-      <div
-        data-tauri-drag-region
-        className="flex items-center gap-2"
-      >
+      <div data-tauri-drag-region className="flex items-center gap-2">
         <div className="bg-primary h-3 w-3 rounded-sm" aria-hidden />
         <span className="text-sm font-medium">Taoscope</span>
       </div>
 
       <div
         data-tauri-drag-region
-        className="flex flex-1 items-center justify-center"
+        className="flex flex-1 items-center justify-center gap-2"
       >
-        <span className="text-muted-foreground text-xs">
-          conn: <span className="font-mono">—</span>
+        <span className="text-muted-foreground text-xs">conn:</span>
+        <span className="text-foreground font-mono text-xs">
+          {currentConn ? currentConn.name : "—"}
         </span>
+        {currentConn && (
+          <span
+            className={cn(
+              "inline-block h-2 w-2 rounded-full",
+              currentConn.status === "online"
+                ? "bg-primary"
+                : "bg-muted-foreground/50",
+            )}
+            aria-hidden
+          />
+        )}
       </div>
 
       <div className="flex items-center gap-1">

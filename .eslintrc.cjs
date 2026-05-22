@@ -23,4 +23,26 @@ module.exports = {
       { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
     ],
   },
+  overrides: [
+    {
+      // Components must use the DataSource only via the Provider/hook, never
+      // a concrete implementation. This keeps the Phase-2 swap (MockDataSource
+      // -> TauriDataSource) a one-line change in App.tsx.
+      files: ["src/components/**/*.{ts,tsx}"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              {
+                name: "@/datasource/mock",
+                message:
+                  "Components must access DataSource via useDataSource(); do not import concrete implementations.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
 };

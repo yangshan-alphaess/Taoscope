@@ -3,7 +3,7 @@
 - [x] 1.1 在仓库根目录用 `pnpm create tauri-app` 或手动初始化 Tauri 2 + React 18 + Vite + TypeScript 工程，包管理选 pnpm
 - [x] 1.2 调整生成的目录结构：保留 `src/`、`src-tauri/`，删除示例组件与示例样式
 - [x] 1.3 添加 `.gitignore`：`node_modules/`、`dist/`、`src-tauri/target/`、`*.local`、`.DS_Store`
-- [ ] 1.4 提交首次 commit：`chore: scaffold tauri + react + vite + ts` *(deferred — pending user confirmation; see implementation summary)*
+- [x] 1.4 提交首次 commit：`chore: scaffold tauri + react + vite + ts` *(commit 9d05ecb)*
 
 ## 2. TypeScript 与路径别名
 
