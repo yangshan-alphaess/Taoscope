@@ -106,6 +106,24 @@ export interface TestConnectionResult {
   message?: string;
 }
 
+export interface Console {
+  id: string;
+  /** Display name; unique within a single connection. */
+  name: string;
+  /** Connection this console is bound to; immutable after creation. */
+  connectionId: string;
+  /** Default database for this console; may be null. */
+  currentDb: string | null;
+  /** Epoch milliseconds at creation. */
+  createdAt: number;
+}
+
+export interface CreateConsoleInput {
+  connectionId: string;
+  /** Optional explicit name; if absent, an auto-numbered "Console #N" is used. */
+  name?: string;
+}
+
 export interface DataSource {
   listConnections(): Promise<Connection[]>;
   testConnection(connId: string): Promise<TestConnectionResult>;
@@ -127,4 +145,13 @@ export interface DataSource {
 
   loadScratch(consoleId: string): Promise<string>;
   saveScratch(consoleId: string, content: string): Promise<void>;
+
+  // Console workspace
+  listConsoles(): Promise<Console[]>;
+  createConsole(input: CreateConsoleInput): Promise<Console>;
+  renameConsole(id: string, name: string): Promise<void>;
+  updateConsoleDb(id: string, db: string | null): Promise<void>;
+  deleteConsole(id: string): Promise<void>;
+  loadResult(consoleId: string): Promise<QueryResult | null>;
+  saveResult(consoleId: string, result: QueryResult): Promise<void>;
 }

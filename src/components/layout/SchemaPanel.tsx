@@ -17,8 +17,11 @@ export function SchemaPanel() {
   const ds = useDataSource();
   const connections = useAppState((s) => s.connections);
   const currentConnectionId = useAppState((s) => s.currentConnectionId);
-  const currentDatabase = useAppState((s) => s.currentDatabase);
-  const setDatabase = useAppState((s) => s.setDatabase);
+  // `schemaBrowsingDb` is intentionally UI-only state for the SchemaPanel's
+  // expanded database. It does NOT drive any SQL execution. Each Console
+  // owns its own `currentDb` independently.
+  const browsingDb = useAppState((s) => s.schemaBrowsingDb);
+  const setBrowsingDb = useAppState((s) => s.setSchemaBrowsingDb);
 
   const currentConn = connections.find((c) => c.id === currentConnectionId) ?? null;
   const isOffline = currentConn?.status === "offline";
@@ -51,9 +54,9 @@ export function SchemaPanel() {
     };
   }, [ds, currentConnectionId, isOffline]);
 
-  // Fetch the database's STables + non-child tables when currentDatabase changes.
+  // Fetch the database's STables + non-child tables when browsingDb changes.
   useEffect(() => {
-    if (!currentConnectionId || !currentDatabase || isOffline) {
+    if (!currentConnectionId || !browsingDb || isOffline) {
       setStables([]);
       setTables([]);
       setExpanded(new Set());
@@ -63,8 +66,8 @@ export function SchemaPanel() {
     let cancelled = false;
     setDbContentLoading(true);
     Promise.all([
-      ds.listSTables(currentConnectionId, currentDatabase),
-      ds.listTables(currentConnectionId, currentDatabase, {
+      ds.listSTables(currentConnectionId, browsingDb),
+      ds.listTables(currentConnectionId, browsingDb, {
         page: 1,
         pageSize: 200,
       }),
@@ -79,7 +82,7 @@ export function SchemaPanel() {
     return () => {
       cancelled = true;
     };
-  }, [ds, currentConnectionId, currentDatabase, isOffline]);
+  }, [ds, currentConnectionId, browsingDb, isOffline]);
 
   function toggleStable(name: string) {
     setExpanded((prev) => {
@@ -91,13 +94,13 @@ export function SchemaPanel() {
       next.add(name);
       return next;
     });
-    if (!children[name] && currentConnectionId && currentDatabase) {
+    if (!children[name] && currentConnectionId && browsingDb) {
       setChildren((prev) => ({
         ...prev,
         [name]: { loading: true, items: [], total: 0 },
       }));
       ds
-        .listTables(currentConnectionId, currentDatabase, {
+        .listTables(currentConnectionId, browsingDb, {
           stable: name,
           page: 1,
           pageSize: CHILD_PAGE_SIZE,
@@ -116,7 +119,7 @@ export function SchemaPanel() {
   }
 
   return (
-    <section className="bg-background border-border flex w-64 shrink-0 flex-col border-r">
+    <section className="bg-background border-border flex w-56 shrink-0 flex-col border-r">
       <div className="border-border flex h-9 shrink-0 items-center border-b px-3">
         <h2 className="text-xs font-semibold tracking-wide uppercase">
           Schema
@@ -139,12 +142,12 @@ export function SchemaPanel() {
         ) : (
           <ul className="py-1 text-xs">
             {databases.map((db) => {
-              const selected = db.name === currentDatabase;
+              const selected = db.name === browsingDb;
               return (
                 <li key={db.name}>
                   <button
                     type="button"
-                    onClick={() => setDatabase(db.name)}
+                    onClick={() => setBrowsingDb(db.name)}
                     className={cn(
                       "flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors",
                       selected

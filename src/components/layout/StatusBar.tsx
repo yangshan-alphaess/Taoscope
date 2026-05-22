@@ -2,13 +2,17 @@ import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
 
 export function StatusBar() {
-  const execStatus = useAppState((s) => s.execStatus);
-  const execError = useAppState((s) => s.execError);
-  const lastResult = useAppState((s) => s.lastResult);
+  const activeConsoleId = useAppState((s) => s.activeConsoleId);
+  const runtime = useAppState((s) =>
+    activeConsoleId ? s.consoleRuntime[activeConsoleId] : undefined,
+  );
+
+  // No active console -> "ready". With a runtime, follow its execStatus.
+  const status = runtime?.execStatus ?? "idle";
 
   let leftLabel: string;
-  switch (execStatus) {
-    case "ready":
+  switch (status) {
+    case "idle":
       leftLabel = "ready";
       break;
     case "running":
@@ -18,11 +22,11 @@ export function StatusBar() {
       leftLabel = "OK";
       break;
     case "error":
-      leftLabel = `ERROR: ${execError ?? "unknown"}`;
+      leftLabel = `ERROR: ${runtime?.execError ?? "unknown"}`;
       break;
   }
 
-  const showStats = execStatus === "ok" && lastResult !== null;
+  const showStats = status === "ok" && runtime?.lastResult != null;
 
   return (
     <footer className="bg-background border-border text-muted-foreground flex h-6 shrink-0 items-center justify-between border-t px-3 text-xs">
@@ -30,11 +34,11 @@ export function StatusBar() {
         <span
           className={cn(
             "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
-            execStatus === "ok"
+            status === "ok"
               ? "bg-primary"
-              : execStatus === "error"
+              : status === "error"
                 ? "bg-destructive"
-                : execStatus === "running"
+                : status === "running"
                   ? "bg-muted-foreground animate-pulse"
                   : "bg-muted-foreground/50",
           )}
@@ -42,10 +46,10 @@ export function StatusBar() {
         <span className="truncate">{leftLabel}</span>
       </div>
       <div className="font-mono">
-        {showStats ? `${lastResult!.rowCount} rows` : "— rows"}
+        {showStats ? `${runtime!.lastResult!.rowCount} rows` : "— rows"}
       </div>
       <div className="font-mono">
-        {showStats ? `${lastResult!.elapsedMs} ms` : "— ms"}
+        {showStats ? `${runtime!.lastResult!.elapsedMs} ms` : "— ms"}
       </div>
     </footer>
   );

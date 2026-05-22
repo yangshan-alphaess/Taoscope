@@ -5,9 +5,12 @@
  * ignores the input SQL and always returns the same demo time-series payload.
  */
 
+import { nanoid } from "nanoid";
 import type {
   Column,
   Connection,
+  Console,
+  CreateConsoleInput,
   Database,
   DataSource,
   ListTablesOpts,
@@ -19,6 +22,8 @@ import type {
 } from "@/datasource/types";
 
 const SCRATCH_KEY_PREFIX = "taoscope.scratch.";
+const CONSOLES_KEY = "taoscope.consoles";
+const RESULT_KEY_PREFIX = "taoscope.result.";
 
 /** Yield to the microtask queue so callers always see real async behavior. */
 const tick = () => Promise.resolve();
@@ -318,4 +323,127 @@ export class MockDataSource implements DataSource {
       // Storage may be unavailable (e.g. SSR / private mode); ignore silently.
     }
   }
+
+  // ── Console workspace ──────────────────────────────────────────────────
+
+  async listConsoles(): Promise<Console[]> {
+    await tick();
+    return loadAllConsoles().map((c) => ({ ...c }));
+  }
+
+  async createConsole(input: CreateConsoleInput): Promise<Console> {
+    await tick();
+    const list = loadAllConsoles();
+    const name = input.name ?? autoNextName(list, input.connectionId);
+    const created: Console = {
+      id: nanoid(),
+      name,
+      connectionId: input.connectionId,
+      currentDb: null,
+      createdAt: Date.now(),
+    };
+    list.push(created);
+    persistAllConsoles(list);
+    return { ...created };
+  }
+
+  async renameConsole(id: string, name: string): Promise<void> {
+    await tick();
+    const list = loadAllConsoles();
+    const target = list.find((c) => c.id === id);
+    if (!target) throw new Error(`Console not found: ${id}`);
+    if (target.name === name) {
+      // No-op rename is allowed.
+      return;
+    }
+    const clash = list.find(
+      (c) =>
+        c.id !== id &&
+        c.connectionId === target.connectionId &&
+        c.name === name,
+    );
+    if (clash) {
+      throw new Error("Console name already exists");
+    }
+    target.name = name;
+    persistAllConsoles(list);
+  }
+
+  async updateConsoleDb(id: string, db: string | null): Promise<void> {
+    await tick();
+    const list = loadAllConsoles();
+    const target = list.find((c) => c.id === id);
+    if (!target) throw new Error(`Console not found: ${id}`);
+    target.currentDb = db;
+    persistAllConsoles(list);
+  }
+
+  async deleteConsole(id: string): Promise<void> {
+    await tick();
+    const list = loadAllConsoles();
+    const next = list.filter((c) => c.id !== id);
+    persistAllConsoles(next);
+    try {
+      localStorage.removeItem(SCRATCH_KEY_PREFIX + id);
+      localStorage.removeItem(RESULT_KEY_PREFIX + id);
+    } catch {
+      // ignore
+    }
+  }
+
+  async loadResult(consoleId: string): Promise<QueryResult | null> {
+    await tick();
+    try {
+      const raw = localStorage.getItem(RESULT_KEY_PREFIX + consoleId);
+      if (!raw) return null;
+      return JSON.parse(raw) as QueryResult;
+    } catch {
+      return null;
+    }
+  }
+
+  async saveResult(consoleId: string, result: QueryResult): Promise<void> {
+    await tick();
+    try {
+      localStorage.setItem(RESULT_KEY_PREFIX + consoleId, JSON.stringify(result));
+    } catch {
+      // ignore
+    }
+  }
+}
+
+// ── Console list persistence helpers (file-private) ─────────────────────
+
+function loadAllConsoles(): Console[] {
+  try {
+    const raw = localStorage.getItem(CONSOLES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as Console[];
+  } catch {
+    return [];
+  }
+}
+
+function persistAllConsoles(list: Console[]): void {
+  try {
+    localStorage.setItem(CONSOLES_KEY, JSON.stringify(list));
+  } catch {
+    // ignore
+  }
+}
+
+const AUTO_NAME_RE = /^Console #(\d+)$/;
+
+function autoNextName(list: Console[], connectionId: string): string {
+  let max = 0;
+  for (const c of list) {
+    if (c.connectionId !== connectionId) continue;
+    const m = AUTO_NAME_RE.exec(c.name);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `Console #${max + 1}`;
 }
