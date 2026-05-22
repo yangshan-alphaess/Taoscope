@@ -40,3 +40,5 @@ vite.config.d.ts
 # Foreign lockfiles (this repo uses pnpm)
 package-lock.json
 yarn.lock
+
+/openspec
