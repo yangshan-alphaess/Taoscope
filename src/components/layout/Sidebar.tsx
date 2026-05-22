@@ -8,6 +8,7 @@ import type { Connection } from "@/datasource/types";
 import { cn } from "@/lib/utils";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
 import { ConnectionFormDialog } from "@/components/layout/ConnectionFormDialog";
+import { confirm } from "@/components/ui/confirm";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -57,7 +58,15 @@ export function Sidebar() {
     setConnections(list);
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, name: string) {
+    const ok = await confirm({
+      title: `Delete connection "${name}"?`,
+      description:
+        "Consoles bound to this connection remain but can no longer query.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await ds.deleteConnection(id);
       await refreshConnections();
@@ -162,7 +171,7 @@ export function Sidebar() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleDelete(c.id);
+                        void handleDelete(c.id, c.name);
                       }}
                       className="text-muted-foreground/70 hover:text-destructive hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
                       aria-label={`Delete ${c.name}`}

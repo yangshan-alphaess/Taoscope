@@ -5,6 +5,7 @@ import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
 import { RenamableLabel } from "@/components/console/RenamableLabel";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
+import { confirm } from "@/components/ui/confirm";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -41,6 +42,15 @@ export function ConsolesPanel() {
   }
 
   async function handleDelete(id: string) {
+    const name = consoles.find((c) => c.id === id)?.name ?? id;
+    const ok = await confirm({
+      title: `Delete console "${name}"?`,
+      description:
+        "The console and its saved SQL scratch will be permanently removed.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     await ds.deleteConsole(id);
     removeConsole(id);
   }

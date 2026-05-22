@@ -9,6 +9,7 @@ import { MainArea } from "@/components/layout/MainArea";
 import { StatusBar } from "@/components/layout/StatusBar";
 import { ConsolesPanel } from "@/components/console/ConsolesPanel";
 import { ResultPanel } from "@/components/console/ResultPanel";
+import { ConfirmRoot } from "@/components/ui/ConfirmRoot";
 import { Toaster } from "@/components/ui/sonner";
 
 function App() {
@@ -47,6 +48,7 @@ function App() {
         </div>
         <StatusBar />
         <Toaster richColors position="bottom-right" />
+        <ConfirmRoot />
       </div>
     </DataSourceProvider>
   );
