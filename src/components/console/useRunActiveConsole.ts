@@ -1,5 +1,6 @@
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
+import { applyRowCap, injectRowCapLimit } from "./rowCapInjector";
 
 export interface UseRunActiveConsoleResult {
   canRun: boolean;
@@ -40,11 +41,13 @@ export function useRunActiveConsole(): UseRunActiveConsoleResult {
     if (!canRun || !activeConsole || !connection || !activeConsoleId) return;
     const id = activeConsoleId;
     const scratch = runtime?.scratch ?? "";
+    const sql = injectRowCapLimit(scratch);
     setRunStarted(id);
-    ds.runSql(connection.id, activeConsole.currentDb, scratch)
+    ds.runSql(connection.id, activeConsole.currentDb, sql)
       .then((r) => {
-        setRunOk(id, r);
-        void ds.saveResult(id, r);
+        const capped = applyRowCap(r);
+        setRunOk(id, capped);
+        void ds.saveResult(id, capped);
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);

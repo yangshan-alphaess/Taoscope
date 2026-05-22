@@ -172,12 +172,13 @@ const DEMO_QUERY_COLUMNS: Column[] = [
   { name: "groupId", type: "INT", isTag: true },
 ];
 
-function buildDemoRows(): unknown[][] {
+function buildDemoRows(n = 10): unknown[][] {
+  const count = Math.min(Math.max(n, 0), 1001);
   const now = Date.now();
   const rows: unknown[][] = [];
-  for (let i = 9; i >= 0; i--) {
+  for (let i = 0; i < count; i++) {
     rows.push([
-      now - i * 1000,
+      now - (count - 1 - i) * 1000,
       randomFloat(8.5, 14.5, 2),
       randomInt(215, 232),
       randomFloat(-0.5, 0.5, 3),
@@ -293,10 +294,12 @@ export class MockDataSource implements DataSource {
   async runSql(
     _connId: string,
     _db: string | null,
-    _sql: string,
+    sql: string,
   ): Promise<QueryResult> {
     await tick();
-    const rows = buildDemoRows();
+    const match = sql.match(/\bLIMIT\s+(\d+)/i);
+    const n = match ? Math.min(Number(match[1]), 1001) : 10;
+    const rows = buildDemoRows(n);
     return {
       columns: DEMO_QUERY_COLUMNS.map((c) => ({ ...c })),
       rows,
