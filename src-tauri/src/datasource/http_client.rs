@@ -338,48 +338,58 @@ pub async fn list_tables(
         });
     }
 
-    // No stable filter: SHOW TABLES + client-side slice. TDengine 3.x does
-    // NOT accept `SHOW TABLES FROM <db>` (MySQL-style) — instead route via
-    // the REST path /rest/sql/<db> so SHOW TABLES resolves against the named db.
-    let resp = execute_sql(conn, Some(db), "SHOW TABLES").await?;
+    // No stable filter: list only non-child (NORMAL_TABLE) tables in the db.
+    // `SHOW TABLES` returns every table including child tables, and TDengine
+    // versions differ on whether the `stable_name` column is even present
+    // — making client-side `is_child` detection unreliable. Query the
+    // metadata view directly for unambiguous filtering.
+    let search_clause = match &opts.search {
+        Some(s) if !s.is_empty() => format!(
+            " AND table_name LIKE {}",
+            sql_str(&format!("%{}%", s))
+        ),
+        _ => String::new(),
+    };
 
-    let name_idx = column_index(&resp.column_meta, "table_name")
-        .or_else(|| column_index(&resp.column_meta, "name"))
-        .unwrap_or(0);
-    let stable_idx = column_index(&resp.column_meta, "stable_name");
-
-    let mut all: Vec<Table> = Vec::with_capacity(resp.data.len());
-    for row in &resp.data {
-        let Some(name) = row.get(name_idx).and_then(cell_to_string) else {
-            continue;
-        };
-        let parent = stable_idx.and_then(|i| row.get(i)).and_then(cell_to_string);
-        let is_child = parent.as_ref().is_some_and(|p| !p.is_empty());
-        // Child tables belong under their parent STable (separate listing
-        // via opts.stable), not directly under the database.
-        if is_child {
-            continue;
+    let items_sql = format!(
+        "SELECT table_name FROM information_schema.ins_tables \
+         WHERE db_name = {} AND type = 'NORMAL_TABLE'{} \
+         LIMIT {} OFFSET {}",
+        sql_str(db),
+        search_clause,
+        page_size,
+        offset
+    );
+    let items_resp = execute_sql(conn, None, &items_sql).await?;
+    let mut items: Vec<Table> = Vec::with_capacity(items_resp.data.len());
+    for row in &items_resp.data {
+        if let Some(name) = row.first().and_then(cell_to_string) {
+            items.push(Table {
+                name,
+                is_child: false,
+                stable_name: None,
+            });
         }
-        if let Some(search) = &opts.search {
-            if !search.is_empty() && !name.contains(search.as_str()) {
-                continue;
-            }
-        }
-        all.push(Table {
-            name,
-            is_child: false,
-            stable_name: None,
-        });
     }
 
-    let total = all.len() as u32;
-    let slice: Vec<Table> = all
-        .into_iter()
-        .skip(offset as usize)
-        .take(page_size as usize)
-        .collect();
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM information_schema.ins_tables \
+         WHERE db_name = {} AND type = 'NORMAL_TABLE'{}",
+        sql_str(db),
+        search_clause
+    );
+    let total = match execute_sql(conn, None, &count_sql).await {
+        Ok(resp) => resp
+            .data
+            .first()
+            .and_then(|row| row.first())
+            .and_then(cell_to_u32)
+            .unwrap_or(0),
+        Err(_) => items.len() as u32,
+    };
+
     Ok(Paged {
-        items: slice,
+        items,
         total,
         page,
         page_size,
