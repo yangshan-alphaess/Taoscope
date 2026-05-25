@@ -1,15 +1,21 @@
-// Thin Tauri command wrappers around the Mock backend.
+// Thin Tauri command wrappers.
 //
-// All commands take `tauri::State<Mutex<MockState>>` (where state access is
-// needed) plus business arguments. Each one locks state at function entry; the
-// lock is released at scope exit. No command holds the lock across an await.
+// 7 schema/query commands (test_connection, test_connection_config,
+// list_databases, list_stables, list_tables, describe_table, run_sql) route
+// through the HTTP REST client and are `async`. Each one takes a *short* lock
+// on MockState just long enough to clone the Connection out, releases the
+// lock, then performs the async HTTP work.
+//
+// The remaining 15 commands (connections CRUD, scratch / consoles / result /
+// history) keep their synchronous in-memory MockState behavior — `add-sqlite-
+// persistence` will eventually swap that storage layer.
 
 use std::sync::Mutex;
 
 use tauri::State;
 
 use crate::datasource::error::DataSourceError;
-use crate::datasource::mock::MockBackend;
+use crate::datasource::http_client;
 use crate::datasource::state::MockState;
 use crate::datasource::types::{
     Column, Connection, ConnectionInput, ConnectionStatus, Console,
@@ -25,6 +31,20 @@ fn now_millis() -> u64 {
         .unwrap_or(0)
 }
 
+fn clone_connection(
+    state: &Mutex<MockState>,
+    conn_id: &str,
+) -> Result<Connection, DataSourceError> {
+    let s = state.lock().unwrap();
+    s.connections
+        .iter()
+        .find(|c| c.id == conn_id)
+        .cloned()
+        .ok_or_else(|| {
+            DataSourceError::NotFound(format!("Connection not found: {}", conn_id))
+        })
+}
+
 // ── Connections ─────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -36,25 +56,12 @@ pub fn list_connections(
 }
 
 #[tauri::command]
-pub fn test_connection(
+pub async fn test_connection(
     state: State<'_, Mutex<MockState>>,
     conn_id: String,
 ) -> Result<TestConnectionResult, DataSourceError> {
-    let s = state.lock().unwrap();
-    match s.connections.iter().find(|c| c.id == conn_id) {
-        None => Ok(TestConnectionResult {
-            ok: false,
-            message: Some(format!("Unknown connection: {}", conn_id)),
-        }),
-        Some(c) if matches!(c.status, ConnectionStatus::Offline) => Ok(TestConnectionResult {
-            ok: false,
-            message: Some("ECONNREFUSED".into()),
-        }),
-        Some(_) => Ok(TestConnectionResult {
-            ok: true,
-            message: None,
-        }),
-    }
+    let conn = clone_connection(&state, &conn_id)?;
+    Ok(http_client::test_connection(&conn).await)
 }
 
 #[tauri::command]
@@ -128,77 +135,76 @@ pub fn delete_connection(
 }
 
 #[tauri::command]
-pub fn test_connection_config(
+pub async fn test_connection_config(
     input: ConnectionInput,
 ) -> Result<TestConnectionResult, DataSourceError> {
-    Ok(MockBackend::test_connection_config(&input))
+    let conn = Connection {
+        id: String::new(),
+        name: input.name,
+        host: input.host,
+        port: input.port,
+        user: input.user,
+        password: input.password,
+        color: input.color,
+        status: ConnectionStatus::Online,
+    };
+    Ok(http_client::test_connection(&conn).await)
 }
 
-// ── Schema ──────────────────────────────────────────────────────────────
+// ── Schema (HTTP-backed) ────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn list_databases(
+pub async fn list_databases(
     state: State<'_, Mutex<MockState>>,
     conn_id: String,
 ) -> Result<Vec<Database>, DataSourceError> {
-    let s = state.lock().unwrap();
-    Ok(MockBackend::list_databases(&s, &conn_id))
+    let conn = clone_connection(&state, &conn_id)?;
+    http_client::list_databases(&conn).await
 }
 
 #[tauri::command]
-pub fn list_stables(
+pub async fn list_stables(
     state: State<'_, Mutex<MockState>>,
     conn_id: String,
     db: String,
 ) -> Result<Vec<STable>, DataSourceError> {
-    let s = state.lock().unwrap();
-    if let Some(c) = s.connections.iter().find(|c| c.id == conn_id) {
-        if matches!(c.status, ConnectionStatus::Offline) {
-            return Ok(vec![]);
-        }
-    }
-    Ok(MockBackend::list_stables(&conn_id, &db))
+    let conn = clone_connection(&state, &conn_id)?;
+    http_client::list_stables(&conn, &db).await
 }
 
 #[tauri::command]
-pub fn list_tables(
+pub async fn list_tables(
     state: State<'_, Mutex<MockState>>,
     conn_id: String,
     db: String,
     opts: ListTablesOpts,
 ) -> Result<Paged<Table>, DataSourceError> {
-    let s = state.lock().unwrap();
-    if let Some(c) = s.connections.iter().find(|c| c.id == conn_id) {
-        if matches!(c.status, ConnectionStatus::Offline) {
-            return Ok(Paged {
-                items: vec![],
-                total: 0,
-                page: opts.page,
-                page_size: opts.page_size,
-            });
-        }
-    }
-    Ok(MockBackend::list_tables(&conn_id, &db, opts))
+    let conn = clone_connection(&state, &conn_id)?;
+    http_client::list_tables(&conn, &db, &opts).await
 }
 
 #[tauri::command]
-pub fn describe_table(
+pub async fn describe_table(
+    state: State<'_, Mutex<MockState>>,
     conn_id: String,
     db: String,
     table: String,
 ) -> Result<Vec<Column>, DataSourceError> {
-    Ok(MockBackend::describe_table(&conn_id, &db, &table))
+    let conn = clone_connection(&state, &conn_id)?;
+    http_client::describe_table(&conn, &db, &table).await
 }
 
-// ── SQL execution ───────────────────────────────────────────────────────
+// ── SQL execution (HTTP-backed) ─────────────────────────────────────────
 
 #[tauri::command]
-pub fn run_sql(
+pub async fn run_sql(
+    state: State<'_, Mutex<MockState>>,
     conn_id: String,
     db: Option<String>,
     sql: String,
 ) -> Result<QueryResult, DataSourceError> {
-    Ok(MockBackend::run_sql(&conn_id, db.as_deref(), &sql))
+    let conn = clone_connection(&state, &conn_id)?;
+    http_client::run_sql(&conn, db.as_deref(), &sql).await
 }
 
 // ── Scratch ─────────────────────────────────────────────────────────────
@@ -241,7 +247,10 @@ pub fn create_console(
     let mut s = state.lock().unwrap();
     let name = match input.name {
         Some(n) => n,
-        None => MockBackend::next_console_name(&s, &input.connection_id),
+        None => crate::datasource::mock::MockBackend::next_console_name(
+            &s,
+            &input.connection_id,
+        ),
     };
     let created = Console {
         id: nanoid::nanoid!(),

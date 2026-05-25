@@ -2,6 +2,14 @@
 //
 // Mirrors the TypeScript MockDataSource (src/datasource/mock.ts) 1:1 in
 // semantics. Persistence is in-memory only; restart resets to seed.
+//
+// After `add-tdengine-http-client`, the schema/query helpers (list_databases,
+// run_sql, etc.) are no longer wired into Tauri commands — only
+// `seed_connections` and `MockBackend::next_console_name` are still live. The
+// rest is kept for development fallback and will be removed by `cleanup-rust-
+// mock`. The file-level allow keeps `cargo check` quiet in the meantime.
+
+#![allow(dead_code)]
 
 use rand::Rng;
 use regex::Regex;
