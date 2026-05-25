@@ -690,7 +690,7 @@ export function ResourcesPanel() {
                           )}
                           aria-hidden
                         />
-                        <span className="truncate font-medium">
+                        <span className="truncate font-medium" title={c.name}>
                           {highlight(c.name, query)}
                         </span>
                       </button>
@@ -863,7 +863,9 @@ function ConnectionBody({
                 <ChevronRight className="h-3 w-3 shrink-0" />
               )}
               <DbIcon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{highlight(db.name, query)}</span>
+              <span className="truncate" title={db.name}>
+                {highlight(db.name, query)}
+              </span>
             </button>
             {dbOpen && (
               <DatabaseBody

@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { Connection, Console, QueryResult } from "@/datasource/types";
+import type {
+  Connection,
+  Console,
+  HistoryEntry,
+  QueryResult,
+} from "@/datasource/types";
 
 export type ExecStatus = "idle" | "running" | "ok" | "error";
 
@@ -19,6 +24,7 @@ export interface ConsoleRuntimeEntry {
   execStatus: ExecStatus;
   execError: string | null;
   gridState: GridState;
+  history: HistoryEntry[];
 }
 
 const DEFAULT_RUNTIME: ConsoleRuntimeEntry = {
@@ -27,6 +33,7 @@ const DEFAULT_RUNTIME: ConsoleRuntimeEntry = {
   execStatus: "idle",
   execError: null,
   gridState: DEFAULT_GRID_STATE,
+  history: [],
 };
 
 interface AppState {
@@ -53,6 +60,7 @@ interface AppState {
   setRunOk: (id: string, result: QueryResult) => void;
   setRunError: (id: string, message: string) => void;
   setGridState: (id: string, state: GridState) => void;
+  setHistory: (id: string, entries: HistoryEntry[]) => void;
 }
 
 export const useAppState = create<AppState>((set) => ({
@@ -153,6 +161,17 @@ export const useAppState = create<AppState>((set) => ({
         consoleRuntime: {
           ...state.consoleRuntime,
           [id]: { ...prev, gridState },
+        },
+      };
+    }),
+  setHistory: (id, entries) =>
+    set((state) => {
+      const prev = state.consoleRuntime[id];
+      if (!prev) return state;
+      return {
+        consoleRuntime: {
+          ...state.consoleRuntime,
+          [id]: { ...prev, history: entries },
         },
       };
     }),

@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, placeholder } from "@codemirror/view";
 import { sql, MySQL } from "@codemirror/lang-sql";
-import { history, historyKeymap, defaultKeymap } from "@codemirror/commands";
+import {
+  copyLineDown,
+  defaultKeymap,
+  history,
+  historyKeymap,
+  toggleLineComment,
+} from "@codemirror/commands";
 import { searchKeymap } from "@codemirror/search";
 import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { bracketMatching, indentOnInput } from "@codemirror/language";
@@ -54,15 +60,12 @@ export function Editor() {
   const viewRef = useRef<EditorView | null>(null);
   const handleCreateEditor = (view: EditorView) => {
     viewRef.current = view;
-    editorBridge.register((text) => {
-      view.dispatch(view.state.replaceSelection(text));
-      view.focus();
-    });
+    editorBridge.registerView(view);
   };
 
   useEffect(() => {
     return () => {
-      editorBridge.unregister();
+      editorBridge.unregisterView();
     };
   }, []);
 
@@ -80,13 +83,15 @@ export function Editor() {
     Promise.all([
       ds.loadScratch(activeConsoleId),
       ds.loadResult(activeConsoleId),
-    ]).then(([scratch, lastResult]) => {
+      ds.loadHistory(activeConsoleId),
+    ]).then(([scratch, lastResult, history]) => {
       if (cancelled) return;
       hydrateConsoleRuntime(activeConsoleId, {
         scratch,
         lastResult,
         execStatus: "idle",
         execError: null,
+        history,
       });
     });
     return () => {
@@ -131,6 +136,8 @@ export function Editor() {
             return true;
           },
         },
+        { key: "Mod-/", run: toggleLineComment },
+        { key: "Mod-d", run: copyLineDown, preventDefault: true },
       ]),
       ...taoscopeEditorExtensions,
     ];

@@ -2,10 +2,12 @@ import { useMemo, useRef } from "react";
 import {
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type ColumnSizingState,
+  type FilterFn,
   type SortingFnOption,
   type SortingState,
   type Updater,
@@ -19,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { useAppState } from "@/store/appState";
 import { formatCell, isNumericColumn } from "@/components/console/formatCell";
 import { ResultCell } from "@/components/console/ResultCell";
-import { columnToText } from "@/components/console/resultExport";
+import { columnToText, serializeValue } from "@/components/console/resultExport";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -121,7 +123,13 @@ function buildColumnDefs(columns: Column[]): ColumnDef<Row>[] {
   }));
 }
 
-export function ResultGrid({ result }: { result: QueryResult }) {
+export function ResultGrid({
+  result,
+  filterQuery,
+}: {
+  result: QueryResult;
+  filterQuery?: string;
+}) {
   const activeId = useAppState((s) => s.activeConsoleId);
   const gridState =
     useAppState((s) =>
@@ -134,16 +142,37 @@ export function ResultGrid({ result }: { result: QueryResult }) {
     [result.columns],
   );
 
+  const globalFilterFn = useMemo<FilterFn<Row>>(
+    () => (row, _colId, query) => {
+      const q = typeof query === "string" ? query : "";
+      if (!q) return true;
+      const needle = q.toLowerCase();
+      const original = row.original;
+      for (let i = 0; i < result.columns.length; i++) {
+        const col = result.columns[i];
+        if (!col) continue;
+        if (serializeValue(original[i], col).toLowerCase().includes(needle)) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [result.columns],
+  );
+
   const table = useReactTable<Row>({
     data: result.rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     enableColumnResizing: true,
     columnResizeMode: "onChange",
+    globalFilterFn,
     state: {
       sorting: gridState.sorting,
       columnSizing: gridState.columnSizing,
+      globalFilter: filterQuery ?? "",
     },
     onSortingChange: (updater) => {
       if (!activeId) return;

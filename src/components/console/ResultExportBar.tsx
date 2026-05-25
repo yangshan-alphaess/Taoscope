@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from "react";
-import { Copy, Download } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Copy, Download, Search, X } from "lucide-react";
 
 import type { QueryResult } from "@/datasource/types";
 import { cn } from "@/lib/utils";
 import {
   buildFilename,
+  serializeValue,
   toCsv,
   toJson,
 } from "@/components/console/resultExport";
@@ -38,13 +39,40 @@ function downloadBlob(text: string, mime: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function ResultExportBar({ result }: { result: QueryResult }) {
+export function ResultExportBar({
+  result,
+  filterQuery,
+  onFilterChange,
+}: {
+  result: QueryResult;
+  filterQuery: string;
+  onFilterChange: (q: string) => void;
+}) {
   const [feedback, setFeedback] = useState<Record<ButtonKey, Feedback>>({
     copyCsv: "idle",
     downloadCsv: "idle",
     copyJson: "idle",
     downloadJson: "idle",
   });
+  const [filterExpanded, setFilterExpanded] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const matchCount = useMemo(() => {
+    if (!filterQuery) return result.rowCount;
+    const q = filterQuery.toLowerCase();
+    let n = 0;
+    for (const row of result.rows) {
+      for (let i = 0; i < result.columns.length; i++) {
+        const col = result.columns[i];
+        if (!col) continue;
+        if (serializeValue(row[i], col).toLowerCase().includes(q)) {
+          n++;
+          break;
+        }
+      }
+    }
+    return n;
+  }, [filterQuery, result]);
 
   if (result.rows.length === 0) return null;
 
@@ -109,6 +137,18 @@ export function ResultExportBar({ result }: { result: QueryResult }) {
     );
   }
 
+  function toggleFilter() {
+    if (filterExpanded) {
+      onFilterChange("");
+      setFilterExpanded(false);
+    } else {
+      setFilterExpanded(true);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }
+
+  const showInput = filterExpanded || !!filterQuery;
+
   return (
     <div className="border-border bg-card/40 flex shrink-0 items-center gap-1 border-b px-2 py-1">
       {renderButton(
@@ -144,9 +184,50 @@ export function ResultExportBar({ result }: { result: QueryResult }) {
             buildFilename("json"),
           ),
       )}
+      <span className="text-muted-foreground/40 px-1">·</span>
+      <button
+        type="button"
+        onClick={toggleFilter}
+        title="Filter rows"
+        className={cn(
+          "text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center gap-1 rounded-sm px-2 py-1 text-xs",
+          showInput && "text-foreground bg-muted/50",
+        )}
+      >
+        <Search className="h-3 w-3" />
+      </button>
+      {showInput && (
+        <div className="flex items-center gap-1">
+          <input
+            ref={inputRef}
+            type="text"
+            value={filterQuery}
+            onChange={(e) => onFilterChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                onFilterChange("");
+                setFilterExpanded(false);
+              }
+            }}
+            placeholder="Filter…"
+            className="bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none border-border h-6 w-48 rounded-sm border px-1.5 text-xs"
+          />
+          {filterQuery && (
+            <button
+              type="button"
+              onClick={() => onFilterChange("")}
+              className="text-muted-foreground hover:text-foreground rounded-sm p-0.5"
+              aria-label="Clear filter"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      )}
       <span className="text-muted-foreground/60 ml-auto text-xs">
-        {result.rowCount} rows ·{" "}
-        {result.truncated ? "capped at 1000" : "all rows"}
+        {filterQuery
+          ? `${matchCount} of ${result.rowCount} matching`
+          : `${result.rowCount} rows · ${result.truncated ? "capped at 1000" : "all rows"}`}
       </span>
     </div>
   );

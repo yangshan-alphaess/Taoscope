@@ -1,5 +1,8 @@
+import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { Play, Square, WandSparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fmtShortcut } from "@/lib/platform";
+import { QueryHistoryButton } from "./QueryHistoryButton";
 import { useFormatActiveConsole } from "./useFormatActiveConsole";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 
@@ -12,6 +15,7 @@ export function Toolbar() {
       <ToolbarButton
         onClick={run}
         disabled={!canRun}
+        title={fmtShortcut(["Mod", "Enter"])}
         icon={<Play className="h-3.5 w-3.5" />}
         label={isRunning ? "Running…" : "Run"}
         primary
@@ -19,11 +23,14 @@ export function Toolbar() {
       <ToolbarButton
         onClick={format}
         disabled={!canFormat}
+        title={fmtShortcut(["Mod", "Shift", "F"])}
         icon={<WandSparkles className="h-3.5 w-3.5" />}
         label="Format"
       />
+      <QueryHistoryButton />
       <ToolbarButton
         disabled
+        title="Cancel running query (coming soon)"
         icon={<Square className="h-3.5 w-3.5" />}
         label="Cancel"
       />
@@ -32,37 +39,39 @@ export function Toolbar() {
   );
 }
 
-interface ToolbarButtonProps {
+interface ToolbarButtonProps
+  extends Omit<ComponentPropsWithoutRef<"button">, "type"> {
   icon: React.ReactNode;
   label: string;
-  onClick?: () => void;
-  disabled?: boolean;
   primary?: boolean;
 }
 
-function ToolbarButton({
-  icon,
-  label,
-  onClick,
-  disabled,
-  primary,
-}: ToolbarButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-        disabled
-          ? "text-muted-foreground/60 cursor-not-allowed"
-          : primary
-            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
+const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
+  function ToolbarButton(
+    { icon, label, onClick, disabled, primary, title, className, ...rest },
+    ref,
+  ) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        title={title}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+          disabled
+            ? "text-muted-foreground/60 cursor-not-allowed"
+            : primary
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          className,
+        )}
+        {...rest}
+      >
+        {icon}
+        <span>{label}</span>
+      </button>
+    );
+  },
+);

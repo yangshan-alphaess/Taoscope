@@ -134,6 +134,14 @@ export interface CreateConsoleInput {
   name?: string;
 }
 
+export interface HistoryEntry {
+  sql: string;
+  runAt: number;
+  rowCount: number;
+  elapsedMs: number;
+  truncated: boolean;
+}
+
 export interface DataSource {
   listConnections(): Promise<Connection[]>;
   testConnection(connId: string): Promise<TestConnectionResult>;
@@ -168,4 +176,7 @@ export interface DataSource {
   deleteConsole(id: string): Promise<void>;
   loadResult(consoleId: string): Promise<QueryResult | null>;
   saveResult(consoleId: string, result: QueryResult): Promise<void>;
+
+  loadHistory(consoleId: string): Promise<HistoryEntry[]>;
+  saveHistory(consoleId: string, entries: HistoryEntry[]): Promise<void>;
 }

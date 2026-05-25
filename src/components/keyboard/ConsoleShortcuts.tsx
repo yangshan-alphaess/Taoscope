@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
+import * as editorBridge from "@/components/console/editorBridge";
 import { formatScratch } from "@/components/console/formatScratch";
 import { useDataSource } from "@/datasource/context";
 import type { DataSource } from "@/datasource/types";
@@ -75,6 +76,19 @@ export function ConsoleShortcuts() {
         if (!activeConsoleId) return;
         const runtime = consoleRuntime[activeConsoleId];
         if (!runtime || runtime.scratch.trim().length === 0) return;
+
+        const sel = editorBridge.getSelectionRange();
+        if (sel) {
+          const selText = editorBridge.getSelectionText();
+          const result = formatScratch(selText);
+          if (result.ok) {
+            editorBridge.replaceRange(sel.from, sel.to, result.formatted);
+          } else {
+            toast.error(`Failed to format SQL: ${result.message}`);
+          }
+          return;
+        }
+
         const result = formatScratch(runtime.scratch);
         if (result.ok) {
           setScratch(activeConsoleId, result.formatted);

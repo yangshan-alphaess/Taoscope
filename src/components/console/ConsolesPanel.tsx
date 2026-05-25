@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
+import { fmtShortcut } from "@/lib/platform";
 import { RenamableLabel } from "@/components/console/RenamableLabel";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
 import { confirm } from "@/components/ui/confirm";
@@ -191,6 +192,9 @@ export function ConsolesPanel() {
                                 className="text-destructive focus:text-destructive"
                               >
                                 Delete
+                                <span className="text-muted-foreground ml-auto pl-3 text-xs">
+                                  {fmtShortcut(["Mod", "W"])}
+                                </span>
                               </ContextMenuItem>
                             </ContextMenuContent>
                           </ContextMenu>

@@ -14,6 +14,7 @@ import type {
   CreateConsoleInput,
   Database,
   DataSource,
+  HistoryEntry,
   ListTablesOpts,
   Paged,
   QueryResult,
@@ -26,6 +27,7 @@ const SCRATCH_KEY_PREFIX = "taoscope.scratch.";
 const CONSOLES_KEY = "taoscope.consoles";
 const RESULT_KEY_PREFIX = "taoscope.result.";
 const CONNECTIONS_KEY = "taoscope.connections";
+const HISTORY_KEY_PREFIX = "taoscope.history.";
 
 /** Yield to the microtask queue so callers always see real async behavior. */
 const tick = () => Promise.resolve();
@@ -517,6 +519,7 @@ export class MockDataSource implements DataSource {
     try {
       localStorage.removeItem(SCRATCH_KEY_PREFIX + id);
       localStorage.removeItem(RESULT_KEY_PREFIX + id);
+      localStorage.removeItem(HISTORY_KEY_PREFIX + id);
     } catch {
       // ignore
     }
@@ -537,6 +540,33 @@ export class MockDataSource implements DataSource {
     await tick();
     try {
       localStorage.setItem(RESULT_KEY_PREFIX + consoleId, JSON.stringify(result));
+    } catch {
+      // ignore
+    }
+  }
+
+  async loadHistory(consoleId: string): Promise<HistoryEntry[]> {
+    await tick();
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY_PREFIX + consoleId);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as HistoryEntry[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async saveHistory(
+    consoleId: string,
+    entries: HistoryEntry[],
+  ): Promise<void> {
+    await tick();
+    try {
+      localStorage.setItem(
+        HISTORY_KEY_PREFIX + consoleId,
+        JSON.stringify(entries),
+      );
     } catch {
       // ignore
     }
