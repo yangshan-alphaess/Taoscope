@@ -13,6 +13,7 @@ import {
 import { searchKeymap } from "@codemirror/search";
 import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { bracketMatching, indentOnInput } from "@codemirror/language";
+import { Prec } from "@codemirror/state";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
 import * as editorBridge from "./editorBridge";
@@ -125,18 +126,27 @@ export function Editor() {
       lineNumbers(),
       placeholder("-- write your SQL here"),
       EditorView.contentAttributes.of({ spellcheck: "false" }),
+      // Mod-Enter has to outrank the default Enter handler (which inserts a
+      // newline) and the autocompletion Enter handler (which accepts a
+      // suggestion). Prec.high + explicit preventDefault makes this
+      // unambiguous regardless of how the other extensions register theirs.
+      Prec.high(
+        keymap.of([
+          {
+            key: "Mod-Enter",
+            preventDefault: true,
+            run: () => {
+              runRef.current();
+              return true;
+            },
+          },
+        ]),
+      ),
       keymap.of([
         ...defaultKeymap,
         ...historyKeymap,
         ...searchKeymap,
         ...completionKeymap,
-        {
-          key: "Mod-Enter",
-          run: () => {
-            runRef.current();
-            return true;
-          },
-        },
         { key: "Mod-/", run: toggleLineComment },
         { key: "Mod-d", run: copyLineDown, preventDefault: true },
       ]),

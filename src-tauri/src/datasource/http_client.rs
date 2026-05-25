@@ -279,18 +279,25 @@ pub async fn list_tables(
     }
 
     if let Some(stable) = &opts.stable {
-        let where_clause = match &opts.search {
-            Some(s) if !s.is_empty() => {
-                format!(" WHERE TBNAME LIKE {}", sql_str(&format!("%{}%", s)))
-            }
+        // Query metadata, not the underlying time-series. `SELECT TBNAME FROM
+        // <db>.<stable>` iterates over every data row in every child table and
+        // emits TBNAME for each — yielding massive duplication. The metadata
+        // table `information_schema.ins_tables` has one row per table.
+        let search_clause = match &opts.search {
+            Some(s) if !s.is_empty() => format!(
+                " AND table_name LIKE {}",
+                sql_str(&format!("%{}%", s))
+            ),
             _ => String::new(),
         };
 
         let items_sql = format!(
-            "SELECT TBNAME FROM {}.{}{} LIMIT {} OFFSET {}",
-            ident(db),
-            ident(stable),
-            where_clause,
+            "SELECT table_name FROM information_schema.ins_tables \
+             WHERE db_name = {} AND stable_name = {}{} \
+             LIMIT {} OFFSET {}",
+            sql_str(db),
+            sql_str(stable),
+            search_clause,
             page_size,
             offset
         );
@@ -307,10 +314,11 @@ pub async fn list_tables(
         }
 
         let count_sql = format!(
-            "SELECT COUNT(*) FROM {}.{}{}",
-            ident(db),
-            ident(stable),
-            where_clause
+            "SELECT COUNT(*) FROM information_schema.ins_tables \
+             WHERE db_name = {} AND stable_name = {}{}",
+            sql_str(db),
+            sql_str(stable),
+            search_clause
         );
         let total = match execute_sql(conn, None, &count_sql).await {
             Ok(resp) => resp
@@ -347,6 +355,11 @@ pub async fn list_tables(
         };
         let parent = stable_idx.and_then(|i| row.get(i)).and_then(cell_to_string);
         let is_child = parent.as_ref().is_some_and(|p| !p.is_empty());
+        // Child tables belong under their parent STable (separate listing
+        // via opts.stable), not directly under the database.
+        if is_child {
+            continue;
+        }
         if let Some(search) = &opts.search {
             if !search.is_empty() && !name.contains(search.as_str()) {
                 continue;
@@ -354,8 +367,8 @@ pub async fn list_tables(
         }
         all.push(Table {
             name,
-            is_child,
-            stable_name: parent.filter(|p| !p.is_empty()),
+            is_child: false,
+            stable_name: None,
         });
     }
 
