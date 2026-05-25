@@ -9,6 +9,7 @@ import { ConsolesPanel } from "@/components/console/ConsolesPanel";
 import { Editor } from "@/components/console/Editor";
 import { ResultPanel } from "@/components/console/ResultPanel";
 import { Toolbar } from "@/components/console/Toolbar";
+import { ConsoleShortcuts } from "@/components/keyboard/ConsoleShortcuts";
 import { ConfirmRoot } from "@/components/ui/ConfirmRoot";
 import {
   ResizableHandle,
@@ -86,6 +87,7 @@ function App() {
         <StatusBar />
         <Toaster richColors position="bottom-right" />
         <ConfirmRoot />
+        <ConsoleShortcuts />
       </div>
     </DataSourceProvider>
   );
