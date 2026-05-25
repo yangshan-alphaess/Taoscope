@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  CornerDownLeft,
   Database as DbIcon,
   FilePlus,
   FileText,
@@ -21,14 +20,12 @@ import { toast } from "sonner";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
 import type {
-  Column,
   Connection,
   Database,
   STable,
   Table,
 } from "@/datasource/types";
 import { cn } from "@/lib/utils";
-import * as editorBridge from "@/components/console/editorBridge";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
 import { ConnectionFormDialog } from "@/components/layout/ConnectionFormDialog";
 import {
@@ -36,6 +33,12 @@ import {
   pruneByConnIds,
   savePersistedExpansion,
 } from "@/components/layout/treeExpandPersist";
+import {
+  TableDetailsDialog,
+  type ChildLoadState,
+  type ColumnsState,
+  type DetailsTarget,
+} from "@/components/layout/TableDetailsDialog";
 import { confirm } from "@/components/ui/confirm";
 import {
   ContextMenu,
@@ -52,16 +55,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const CHILD_PAGE_SIZE = 50;
-
-interface ChildLoadState {
-  items: Table[];
-  total: number;
-  nextPage: number;
-  loading: boolean;
-  error: string | null;
-}
-
-type ColumnsState = Column[] | "loading" | "error";
 
 interface DialogState {
   open: boolean;
@@ -86,30 +79,9 @@ function highlight(text: string, q: string): ReactNode {
   );
 }
 
-function formatType(c: Column): string {
-  const base = `${c.type}${c.length ? `(${c.length})` : ""}`;
-  if (c.isPrimaryTs) return `${base} · ts`;
-  if (c.isTag) return `${base} · tag`;
-  return base;
-}
-
 function nameMatches(name: string, q: string): boolean {
   if (!q) return true;
   return name.toLowerCase().includes(q.toLowerCase());
-}
-
-function InsertButton({ name }: { name: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => editorBridge.insert(name)}
-      title={`Insert "${name}"`}
-      aria-label={`Insert ${name}`}
-      className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-0.5 group-hover:visible"
-    >
-      <CornerDownLeft className="h-3 w-3" />
-    </button>
-  );
 }
 
 export function ResourcesPanel() {
@@ -124,20 +96,19 @@ export function ResourcesPanel() {
     mode: "create",
   });
 
-  // Expansion sets keyed by path (lazy-initialized from localStorage)
+  // Expansion sets keyed by path (lazy-initialized from localStorage). Only
+  // the conn / db levels are inline-expandable now; STable / Table click
+  // opens TableDetailsDialog instead of inline column / child-table panels.
   const [expandedConns, setExpandedConns] = useState<Set<string>>(
     () => new Set(loadPersistedExpansion().conns),
   );
   const [expandedDbs, setExpandedDbs] = useState<Set<string>>(
     () => new Set(loadPersistedExpansion().dbs),
   );
-  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(
-    () => new Set(loadPersistedExpansion().columns),
-  );
-  const [expandedChildren, setExpandedChildren] = useState<Set<string>>(
-    () => new Set(loadPersistedExpansion().children),
-  );
   const [restored, setRestored] = useState(false);
+  const [detailsTarget, setDetailsTarget] = useState<DetailsTarget | null>(
+    null,
+  );
 
   // Lazy caches
   const [dbsByConn, setDbsByConn] = useState<
@@ -167,18 +138,20 @@ export function ResourcesPanel() {
     };
   }, [ds, connections.length, setConnections]);
 
-  // Persist expansion sets whenever any of them change.
+  // Persist conn / db expansion. Older builds also persisted column / child
+  // sets; we keep those slots empty for forward-compat with the storage
+  // shape but no longer track them in React state.
   useEffect(() => {
     savePersistedExpansion({
       conns: [...expandedConns],
       dbs: [...expandedDbs],
-      columns: [...expandedColumns],
-      children: [...expandedChildren],
+      columns: [],
+      children: [],
     });
-  }, [expandedConns, expandedDbs, expandedColumns, expandedChildren]);
+  }, [expandedConns, expandedDbs]);
 
-  // One-shot restore: after connections load, prune stale connId-prefixed keys
-  // and refetch the data needed to render the persisted expanded paths.
+  // One-shot restore: after connections load, prune stale connId-prefixed
+  // keys and refetch the data needed to render the persisted expanded paths.
   useEffect(() => {
     if (restored) return;
     if (connections.length === 0) return;
@@ -187,20 +160,12 @@ export function ResourcesPanel() {
 
     const cleanConns = pruneByConnIds([...expandedConns], valid);
     const cleanDbs = pruneByConnIds([...expandedDbs], valid);
-    const cleanColumns = pruneByConnIds([...expandedColumns], valid);
-    const cleanChildren = pruneByConnIds([...expandedChildren], valid);
 
     if (cleanConns.length !== expandedConns.size) {
       setExpandedConns(new Set(cleanConns));
     }
     if (cleanDbs.length !== expandedDbs.size) {
       setExpandedDbs(new Set(cleanDbs));
-    }
-    if (cleanColumns.length !== expandedColumns.size) {
-      setExpandedColumns(new Set(cleanColumns));
-    }
-    if (cleanChildren.length !== expandedChildren.size) {
-      setExpandedChildren(new Set(cleanChildren));
     }
 
     // Refetch in parallel — each fetch guards against duplicate work by
@@ -237,63 +202,6 @@ export function ResourcesPanel() {
         .catch(() => {
           setStablesByDb((prev) => ({ ...prev, [key]: [] }));
           setTablesByDb((prev) => ({ ...prev, [key]: [] }));
-        });
-    }
-    for (const key of cleanColumns) {
-      if (columnsByTable[key]) continue;
-      const [connId, db, table] = key.split("|");
-      if (!connId || !db || !table) continue;
-      setColumnsByTable((prev) => ({ ...prev, [key]: "loading" }));
-      ds.describeTable(connId, db, table)
-        .then((cols) => {
-          setColumnsByTable((prev) => ({ ...prev, [key]: cols }));
-        })
-        .catch(() => {
-          setColumnsByTable((prev) => ({ ...prev, [key]: "error" }));
-        });
-    }
-    for (const key of cleanChildren) {
-      if (childrenByStable[key]) continue;
-      const [connId, db, stable] = key.split("|");
-      if (!connId || !db || !stable) continue;
-      setChildrenByStable((prev) => ({
-        ...prev,
-        [key]: {
-          items: [],
-          total: 0,
-          nextPage: 1,
-          loading: true,
-          error: null,
-        },
-      }));
-      ds.listTables(connId, db, {
-        stable,
-        page: 1,
-        pageSize: CHILD_PAGE_SIZE,
-      })
-        .then((paged) => {
-          setChildrenByStable((prev) => ({
-            ...prev,
-            [key]: {
-              items: paged.items,
-              total: paged.total,
-              nextPage: 2,
-              loading: false,
-              error: null,
-            },
-          }));
-        })
-        .catch(() => {
-          setChildrenByStable((prev) => ({
-            ...prev,
-            [key]: {
-              items: [],
-              total: 0,
-              nextPage: 1,
-              loading: false,
-              error: "Failed to load. Retry?",
-            },
-          }));
         });
     }
 
@@ -394,45 +302,34 @@ export function ResourcesPanel() {
 
   async function handleRefreshDatabase(connId: string, db: string) {
     const key = `${connId}|${db}`;
-    // Wipe all caches scoped under this database; keep peer databases under
-    // the same connection untouched.
-    setStablesByDb((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    setTablesByDb((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    setColumnsByTable((prev) => {
-      const next: typeof prev = {};
-      for (const k of Object.keys(prev)) {
-        if (!k.startsWith(`${key}|`)) next[k] = prev[k]!;
-      }
-      return next;
-    });
-    setChildrenByStable((prev) => {
-      const next: typeof prev = {};
-      for (const k of Object.keys(prev)) {
-        if (!k.startsWith(`${key}|`)) next[k] = prev[k]!;
-      }
-      return next;
-    });
-    setExpandedDbs((prev) => {
-      if (prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
+    // Single batched pre-fetch update: ensure expansion, wipe descendant
+    // caches, mark the db as loading. The previous version mixed delete-key
+    // and set-"loading" calls on the same map — under React batching the
+    // intermediate delete was a wasted update and only confused traceability.
+    setExpandedDbs((prev) =>
+      prev.has(key) ? prev : new Set([...prev, key]),
+    );
+    setColumnsByTable((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).filter(([k]) => !k.startsWith(`${key}|`)),
+      ),
+    );
+    setChildrenByStable((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).filter(([k]) => !k.startsWith(`${key}|`)),
+      ),
+    );
     setStablesByDb((prev) => ({ ...prev, [key]: "loading" }));
     setTablesByDb((prev) => ({ ...prev, [key]: "loading" }));
+
     try {
       const [stbs, paged] = await Promise.all([
         ds.listSTables(connId, db),
         ds.listTables(connId, db, { page: 1, pageSize: 200 }),
       ]);
+      // Replace both caches atomically — using the latest `prev` (post-await)
+      // guarantees the new arrays land in the most-recent state snapshot, so
+      // DatabaseBody re-renders with the fresh rows without needing a collapse.
       setStablesByDb((prev) => ({ ...prev, [key]: stbs }));
       setTablesByDb((prev) => ({ ...prev, [key]: paged.items }));
       toast.success(`Refreshed ${db}`);
@@ -474,31 +371,18 @@ export function ResourcesPanel() {
       return next;
     });
     if (isOpen) {
-      // Collapsing resets descendant expansion under this database
-      setExpandedColumns((prev) => {
-        const next = new Set<string>();
-        for (const k of prev) if (!k.startsWith(`${key}|`)) next.add(k);
-        return next;
-      });
-      setExpandedChildren((prev) => {
-        const next = new Set<string>();
-        for (const k of prev) if (!k.startsWith(`${key}|`)) next.add(k);
-        return next;
-      });
-      setColumnsByTable((prev) => {
-        const next: typeof prev = {};
-        for (const k of Object.keys(prev)) {
-          if (!k.startsWith(`${key}|`)) next[k] = prev[k]!;
-        }
-        return next;
-      });
-      setChildrenByStable((prev) => {
-        const next: typeof prev = {};
-        for (const k of Object.keys(prev)) {
-          if (!k.startsWith(`${key}|`)) next[k] = prev[k]!;
-        }
-        return next;
-      });
+      // Collapsing drops any cached column / child-table data scoped under
+      // this database, so re-opening + clicking a table later refetches.
+      setColumnsByTable((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).filter(([k]) => !k.startsWith(`${key}|`)),
+        ),
+      );
+      setChildrenByStable((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).filter(([k]) => !k.startsWith(`${key}|`)),
+        ),
+      );
       return;
     }
     if (stablesByDb[key] || tablesByDb[key]) return;
@@ -517,16 +401,11 @@ export function ResourcesPanel() {
     }
   }
 
-  async function toggleColumns(connId: string, db: string, table: string) {
+  // Load helpers invoked by TableDetailsDialog. They no-op if the cache is
+  // already populated; first call kicks off the fetch and writes "loading"
+  // so the dialog shows a spinner.
+  async function loadColumns(connId: string, db: string, table: string) {
     const key = `${connId}|${db}|${table}`;
-    const isOpen = expandedColumns.has(key);
-    setExpandedColumns((prev) => {
-      const next = new Set(prev);
-      if (isOpen) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-    if (isOpen) return;
     const existing = columnsByTable[key];
     if (existing && existing !== "error") return;
     setColumnsByTable((prev) => ({ ...prev, [key]: "loading" }));
@@ -538,28 +417,14 @@ export function ResourcesPanel() {
     }
   }
 
-  async function toggleChildren(
+  async function loadChildren(
     connId: string,
     db: string,
     stable: string,
   ) {
     const key = `${connId}|${db}|${stable}`;
-    const isOpen = expandedChildren.has(key);
-    setExpandedChildren((prev) => {
-      const next = new Set(prev);
-      if (isOpen) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-    if (isOpen) {
-      setChildrenByStable((prev) => {
-        if (!(key in prev)) return prev;
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      return;
-    }
+    const existing = childrenByStable[key];
+    if (existing && !existing.error && existing.items.length > 0) return;
     setChildrenByStable((prev) => ({
       ...prev,
       [key]: {
@@ -856,19 +721,13 @@ export function ResourcesPanel() {
                     dbsByConn={dbsByConn}
                     stablesByDb={stablesByDb}
                     tablesByDb={tablesByDb}
-                    columnsByTable={columnsByTable}
-                    childrenByStable={childrenByStable}
                     expandedDbs={expandedDbs}
-                    expandedColumns={expandedColumns}
-                    expandedChildren={expandedChildren}
                     onToggleDb={toggleDb}
-                    onToggleColumns={toggleColumns}
-                    onToggleChildren={toggleChildren}
-                    onLoadMore={loadMoreChildren}
                     onRefreshDb={handleRefreshDatabase}
                     onCreateConsoleInDb={(connId, db) =>
                       void createConsole(connId, { db })
                     }
+                    onSelectTable={setDetailsTarget}
                   />
                 )}
               </div>
@@ -888,6 +747,16 @@ export function ResourcesPanel() {
           void refreshConnections();
         }}
       />
+
+      <TableDetailsDialog
+        target={detailsTarget}
+        onClose={() => setDetailsTarget(null)}
+        columnsByTable={columnsByTable}
+        childrenByStable={childrenByStable}
+        onRequestColumns={loadColumns}
+        onRequestChildren={loadChildren}
+        onLoadMoreChildren={loadMoreChildren}
+      />
     </section>
   );
 }
@@ -899,17 +768,11 @@ interface ConnectionBodyProps {
   dbsByConn: Record<string, Database[] | "loading">;
   stablesByDb: Record<string, STable[] | "loading">;
   tablesByDb: Record<string, Table[] | "loading">;
-  columnsByTable: Record<string, ColumnsState>;
-  childrenByStable: Record<string, ChildLoadState>;
   expandedDbs: Set<string>;
-  expandedColumns: Set<string>;
-  expandedChildren: Set<string>;
   onToggleDb: (connId: string, db: string) => void;
-  onToggleColumns: (connId: string, db: string, table: string) => void;
-  onToggleChildren: (connId: string, db: string, stable: string) => void;
-  onLoadMore: (connId: string, db: string, stable: string) => void;
   onRefreshDb: (connId: string, db: string) => void;
   onCreateConsoleInDb: (connId: string, db: string) => void;
+  onSelectTable: (target: DetailsTarget) => void;
 }
 
 function ConnectionBody({
@@ -919,17 +782,11 @@ function ConnectionBody({
   dbsByConn,
   stablesByDb,
   tablesByDb,
-  columnsByTable,
-  childrenByStable,
   expandedDbs,
-  expandedColumns,
-  expandedChildren,
   onToggleDb,
-  onToggleColumns,
-  onToggleChildren,
-  onLoadMore,
   onRefreshDb,
   onCreateConsoleInDb,
+  onSelectTable,
 }: ConnectionBodyProps) {
   if (conn.status === "offline") {
     return (
@@ -1026,13 +883,7 @@ function ConnectionBody({
                 query={query}
                 stablesByDb={stablesByDb}
                 tablesByDb={tablesByDb}
-                columnsByTable={columnsByTable}
-                childrenByStable={childrenByStable}
-                expandedColumns={expandedColumns}
-                expandedChildren={expandedChildren}
-                onToggleColumns={onToggleColumns}
-                onToggleChildren={onToggleChildren}
-                onLoadMore={onLoadMore}
+                onSelectTable={onSelectTable}
               />
             )}
           </div>
@@ -1048,13 +899,7 @@ interface DatabaseBodyProps {
   query: string;
   stablesByDb: Record<string, STable[] | "loading">;
   tablesByDb: Record<string, Table[] | "loading">;
-  columnsByTable: Record<string, ColumnsState>;
-  childrenByStable: Record<string, ChildLoadState>;
-  expandedColumns: Set<string>;
-  expandedChildren: Set<string>;
-  onToggleColumns: (connId: string, db: string, table: string) => void;
-  onToggleChildren: (connId: string, db: string, stable: string) => void;
-  onLoadMore: (connId: string, db: string, stable: string) => void;
+  onSelectTable: (target: DetailsTarget) => void;
 }
 
 function DatabaseBody({
@@ -1063,13 +908,7 @@ function DatabaseBody({
   query,
   stablesByDb,
   tablesByDb,
-  columnsByTable,
-  childrenByStable,
-  expandedColumns,
-  expandedChildren,
-  onToggleColumns,
-  onToggleChildren,
-  onLoadMore,
+  onSelectTable,
 }: DatabaseBodyProps) {
   const dbKey = `${connId}|${dbName}`;
   const stbs = stablesByDb[dbKey];
@@ -1094,83 +933,57 @@ function DatabaseBody({
   }
   return (
     <div className="border-border/50 ml-3 border-l pl-1">
-      {visibleStables.map((stb) => {
-        const tableKey = `${connId}|${dbName}|${stb.name}`;
-        const colsOpen = expandedColumns.has(tableKey);
-        const childrenOpen = expandedChildren.has(tableKey);
-        const colsState = columnsByTable[tableKey];
-        const child = childrenByStable[tableKey];
-        return (
-          <div key={stb.name}>
-            <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground relative flex w-full items-center">
-              <button
-                type="button"
-                onClick={() => onToggleColumns(connId, dbName, stb.name)}
-                className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
-              >
-                <Layers className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate" title={stb.name}>
-                  {highlight(stb.name, query)}
-                </span>
-                <span className="text-muted-foreground/70 ml-auto font-mono">
-                  STable · {stb.childCount}
-                </span>
-              </button>
-            </div>
-            {colsOpen && (
-              <ColumnDetail state={colsState} query={query} />
-            )}
-            <button
-              type="button"
-              onClick={() => onToggleChildren(connId, dbName, stb.name)}
-              className="text-muted-foreground/80 hover:text-foreground hover:bg-muted/40 flex items-center gap-1 px-3 py-1 text-xs"
-            >
-              {childrenOpen ? (
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              ) : (
-                <ChevronRight className="h-3 w-3 shrink-0" />
-              )}
-              <span>Child tables</span>
-            </button>
-            {childrenOpen && (
-              <ChildList
-                state={child}
-                query={query}
-                onLoadMore={() => onLoadMore(connId, dbName, stb.name)}
-              />
-            )}
-          </div>
-        );
-      })}
+      {visibleStables.map((stb) => (
+        <button
+          key={stb.name}
+          type="button"
+          onClick={() =>
+            onSelectTable({
+              connId,
+              db: dbName,
+              table: stb.name,
+              isStable: true,
+              childCount: stb.childCount,
+            })
+          }
+          className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
+        >
+          <Layers className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate" title={stb.name}>
+            {highlight(stb.name, query)}
+          </span>
+          <span className="text-muted-foreground/70 ml-auto font-mono">
+            STable · {stb.childCount}
+          </span>
+        </button>
+      ))}
       {visibleStables.length === 0 && stbs.length > 0 && (
         <p className="text-muted-foreground/70 px-3 py-1 italic">
           No matches.
         </p>
       )}
 
-      {visibleTables.map((t) => {
-        const tableKey = `${connId}|${dbName}|${t.name}`;
-        const open = expandedColumns.has(tableKey);
-        const colsState = columnsByTable[tableKey];
-        return (
-          <div key={t.name}>
-            <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground relative flex w-full items-center">
-              <button
-                type="button"
-                onClick={() => onToggleColumns(connId, dbName, t.name)}
-                className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
-              >
-                <span className="w-3 shrink-0" aria-hidden />
-                <FileText className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate" title={t.name}>
-                  {highlight(t.name, query)}
-                </span>
-              </button>
-            </div>
-            {open && <ColumnDetail state={colsState} query={query} />}
-          </div>
-        );
-      })}
+      {visibleTables.map((t) => (
+        <button
+          key={t.name}
+          type="button"
+          onClick={() =>
+            onSelectTable({
+              connId,
+              db: dbName,
+              table: t.name,
+              isStable: false,
+            })
+          }
+          className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
+        >
+          <span className="w-3 shrink-0" aria-hidden />
+          <FileText className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate" title={t.name}>
+            {highlight(t.name, query)}
+          </span>
+        </button>
+      ))}
       {visibleTables.length === 0 && tbls.length > 0 && (
         <p className="text-muted-foreground/70 px-3 py-1 italic">
           No matches.
@@ -1180,134 +993,3 @@ function DatabaseBody({
   );
 }
 
-function ColumnDetail({
-  state,
-  query,
-}: {
-  state: ColumnsState | undefined;
-  query: string;
-}) {
-  if (!state || state === "loading") {
-    return (
-      <div className="border-border/50 ml-3 border-l pl-2 py-0.5">
-        <p className="text-muted-foreground px-3 py-0.5 text-[10px]">
-          Loading…
-        </p>
-      </div>
-    );
-  }
-  if (state === "error") {
-    return (
-      <div className="border-border/50 ml-3 border-l pl-2 py-0.5">
-        <p className="text-destructive px-3 py-0.5 text-[10px]">
-          Failed to load columns.
-        </p>
-      </div>
-    );
-  }
-  const visible = state.filter((c) => nameMatches(c.name, query));
-  return (
-    <div className="border-border/50 ml-3 border-l pl-2 py-0.5">
-      {visible.length === 0 && state.length > 0 ? (
-        <p className="text-muted-foreground/70 px-3 py-0.5 text-[10px] italic">
-          No matches.
-        </p>
-      ) : (
-        visible.map((c) => (
-          <div
-            key={c.name}
-            className="group hover:bg-muted/40 flex items-center gap-2 px-3 py-0.5 text-[10px]"
-          >
-            <span
-              className="text-foreground font-mono truncate"
-              title={c.name}
-            >
-              {highlight(c.name, query)}
-            </span>
-            <span className="text-muted-foreground/70 ml-auto font-mono">
-              {formatType(c)}
-            </span>
-            <InsertButton name={c.name} />
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-function ChildList({
-  state,
-  query,
-  onLoadMore,
-}: {
-  state: ChildLoadState | undefined;
-  query: string;
-  onLoadMore: () => void;
-}) {
-  if (!state) return null;
-  if (state.loading && state.items.length === 0) {
-    return (
-      <div className="border-border/50 ml-3 border-l pl-1">
-        <p className="text-muted-foreground px-3 py-1 text-xs">Loading…</p>
-      </div>
-    );
-  }
-  if (state.error && state.items.length === 0) {
-    return (
-      <div className="border-border/50 ml-3 border-l pl-1">
-        <button
-          type="button"
-          onClick={onLoadMore}
-          className="text-destructive hover:text-foreground px-3 py-1 text-xs"
-        >
-          {state.error}
-        </button>
-      </div>
-    );
-  }
-  const visible = state.items.filter((t) => nameMatches(t.name, query));
-  const remaining = state.total - state.items.length;
-  return (
-    <div className="border-border/50 ml-3 border-l pl-1">
-      {visible.length === 0 && state.items.length > 0 ? (
-        <p className="text-muted-foreground/70 px-3 py-1 italic">
-          No matches.
-        </p>
-      ) : (
-        visible.map((t) => (
-          <div
-            key={t.name}
-            className="group text-muted-foreground hover:bg-muted/40 flex items-center px-3 py-0.5 font-mono text-xs"
-            title={t.name}
-          >
-            <span className="truncate">{highlight(t.name, query)}</span>
-          </div>
-        ))
-      )}
-      {remaining > 0 && (
-        <button
-          type="button"
-          onClick={onLoadMore}
-          disabled={state.loading}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted/40 mx-3 my-1 flex w-full items-center justify-center gap-1 rounded-sm py-1 text-xs disabled:opacity-60"
-        >
-          {state.loading ? (
-            <span>Loading…</span>
-          ) : (
-            <>
-              <Plus className="h-3 w-3 shrink-0" />
-              <span>
-                Load {CHILD_PAGE_SIZE} more ({remaining} remaining)
-              </span>
-            </>
-          )}
-        </button>
-      )}
-      {state.error && state.items.length > 0 && (
-        <p className="text-destructive px-3 py-0.5 text-[10px]">
-          {state.error}
-        </p>
-      )}
-    </div>
-  );
-}

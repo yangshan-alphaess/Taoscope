@@ -62,16 +62,10 @@ export function TitleBar() {
     <div
       data-tauri-drag-region
       className={cn(
-        "bg-background border-border flex h-10 shrink-0 border-b px-4 select-none",
-        // macOS traffic lights sit near the top of the window (~y=6-12, vertical
-        // center around y=13) because they live inside the native 28px titlebar
-        // zone that `titleBarStyle: Overlay` extends the webview into. Align our
-        // content to that band via items-start + pt-1.5 instead of vertical-
-        // centering in the full 40px bar (which would put text at y=20 — visibly
-        // below the lights).
-        isMac
-          ? "pl-20 items-start pt-1.5"
-          : "items-center",
+        // h-7 (~28px) matches the native macOS titlebar height, so traffic
+        // lights and our centered content share the same vertical midline.
+        "bg-background border-border flex h-7 shrink-0 items-center border-b px-4 select-none",
+        isMac && "pl-20",
       )}
     >
       <div data-tauri-drag-region className="flex items-center gap-2">
@@ -105,7 +99,7 @@ export function TitleBar() {
           <button
             type="button"
             onClick={() => void runOnWindow("minimize")}
-            className="hover:bg-muted text-muted-foreground hover:text-foreground inline-flex h-8 w-10 items-center justify-center transition-colors"
+            className="hover:bg-muted text-muted-foreground hover:text-foreground inline-flex h-6 w-9 items-center justify-center transition-colors"
             aria-label="Minimize"
           >
             <Minus className="h-4 w-4" />
@@ -113,7 +107,7 @@ export function TitleBar() {
           <button
             type="button"
             onClick={() => void runOnWindow("toggleMaximize")}
-            className="hover:bg-muted text-muted-foreground hover:text-foreground inline-flex h-8 w-10 items-center justify-center transition-colors"
+            className="hover:bg-muted text-muted-foreground hover:text-foreground inline-flex h-6 w-9 items-center justify-center transition-colors"
             aria-label={isMaximized ? "Restore" : "Maximize"}
           >
             {isMaximized ? (
@@ -125,7 +119,7 @@ export function TitleBar() {
           <button
             type="button"
             onClick={() => void runOnWindow("close")}
-            className="text-muted-foreground hover:bg-destructive hover:text-destructive-foreground inline-flex h-8 w-10 items-center justify-center transition-colors"
+            className="text-muted-foreground hover:bg-destructive hover:text-destructive-foreground inline-flex h-6 w-9 items-center justify-center transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
