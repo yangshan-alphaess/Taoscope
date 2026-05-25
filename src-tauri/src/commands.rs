@@ -1,14 +1,11 @@
 // Thin Tauri command wrappers.
 //
-// 7 schema/query commands (test_connection, test_connection_config,
-// list_databases, list_stables, list_tables, describe_table, run_sql) route
-// through the HTTP REST client and are `async`. Each one takes a *short* lock
-// on MockState just long enough to clone the Connection out, releases the
-// lock, then performs the async HTTP work.
+// 7 schema/query commands route through the HTTP REST client and are `async`.
+// 15 in-memory-state commands delegate to `Store` (SQLite-backed) and are
+// synchronous.
 //
-// The remaining 15 commands (connections CRUD, scratch / consoles / result /
-// history) keep their synchronous in-memory MockState behavior — `add-sqlite-
-// persistence` will eventually swap that storage layer.
+// Both flavors take a brief lock on `Mutex<Store>` and never hold it across
+// an `.await`.
 
 use std::sync::Mutex;
 
@@ -16,11 +13,10 @@ use tauri::State;
 
 use crate::datasource::error::DataSourceError;
 use crate::datasource::http_client;
-use crate::datasource::state::MockState;
+use crate::datasource::state::Store;
 use crate::datasource::types::{
-    Column, Connection, ConnectionInput, ConnectionStatus, Console,
-    CreateConsoleInput, Database, HistoryEntry, ListTablesOpts, Paged, QueryResult,
-    STable, Table, TestConnectionResult,
+    Column, Connection, ConnectionInput, Console, CreateConsoleInput, Database,
+    HistoryEntry, ListTablesOpts, Paged, QueryResult, STable, Table, TestConnectionResult,
 };
 
 fn now_millis() -> u64 {
@@ -32,32 +28,25 @@ fn now_millis() -> u64 {
 }
 
 fn clone_connection(
-    state: &Mutex<MockState>,
+    state: &Mutex<Store>,
     conn_id: &str,
 ) -> Result<Connection, DataSourceError> {
     let s = state.lock().unwrap();
-    s.connections
-        .iter()
-        .find(|c| c.id == conn_id)
-        .cloned()
-        .ok_or_else(|| {
-            DataSourceError::NotFound(format!("Connection not found: {}", conn_id))
-        })
+    s.get_connection(conn_id)
 }
 
 // ── Connections ─────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn list_connections(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
 ) -> Result<Vec<Connection>, DataSourceError> {
-    let s = state.lock().unwrap();
-    Ok(s.connections.clone())
+    state.lock().unwrap().list_connections()
 }
 
 #[tauri::command]
 pub async fn test_connection(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     conn_id: String,
 ) -> Result<TestConnectionResult, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
@@ -66,72 +55,27 @@ pub async fn test_connection(
 
 #[tauri::command]
 pub fn create_connection(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     input: ConnectionInput,
 ) -> Result<Connection, DataSourceError> {
-    let mut s = state.lock().unwrap();
-    let name = input.name.trim().to_string();
-    if s.connections.iter().any(|c| c.name == name) {
-        return Err(DataSourceError::AlreadyExists(format!(
-            "Connection name '{}' already exists",
-            name
-        )));
-    }
-    let created = Connection {
-        id: nanoid::nanoid!(),
-        name,
-        host: input.host,
-        port: input.port,
-        user: input.user,
-        password: input.password,
-        color: input.color,
-        status: ConnectionStatus::Online,
-    };
-    s.connections.push(created.clone());
-    Ok(created)
+    state.lock().unwrap().create_connection(input)
 }
 
 #[tauri::command]
 pub fn update_connection(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     id: String,
     input: ConnectionInput,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    let name = input.name.trim().to_string();
-    if s.connections.iter().any(|c| c.id != id && c.name == name) {
-        return Err(DataSourceError::AlreadyExists(format!(
-            "Connection name '{}' already exists",
-            name
-        )));
-    }
-    let idx = s
-        .connections
-        .iter()
-        .position(|c| c.id == id)
-        .ok_or_else(|| DataSourceError::NotFound(format!("Connection not found: {}", id)))?;
-    let prev = s.connections[idx].clone();
-    s.connections[idx] = Connection {
-        id: prev.id,
-        status: prev.status,
-        name,
-        host: input.host,
-        port: input.port,
-        user: input.user,
-        password: input.password,
-        color: input.color,
-    };
-    Ok(())
+    state.lock().unwrap().update_connection(&id, input)
 }
 
 #[tauri::command]
 pub fn delete_connection(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     id: String,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    s.connections.retain(|c| c.id != id);
-    Ok(())
+    state.lock().unwrap().delete_connection(&id)
 }
 
 #[tauri::command]
@@ -146,7 +90,7 @@ pub async fn test_connection_config(
         user: input.user,
         password: input.password,
         color: input.color,
-        status: ConnectionStatus::Online,
+        status: crate::datasource::types::ConnectionStatus::Online,
     };
     Ok(http_client::test_connection(&conn).await)
 }
@@ -155,7 +99,7 @@ pub async fn test_connection_config(
 
 #[tauri::command]
 pub async fn list_databases(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     conn_id: String,
 ) -> Result<Vec<Database>, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
@@ -164,7 +108,7 @@ pub async fn list_databases(
 
 #[tauri::command]
 pub async fn list_stables(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     conn_id: String,
     db: String,
 ) -> Result<Vec<STable>, DataSourceError> {
@@ -174,7 +118,7 @@ pub async fn list_stables(
 
 #[tauri::command]
 pub async fn list_tables(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     conn_id: String,
     db: String,
     opts: ListTablesOpts,
@@ -185,7 +129,7 @@ pub async fn list_tables(
 
 #[tauri::command]
 pub async fn describe_table(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     conn_id: String,
     db: String,
     table: String,
@@ -198,7 +142,7 @@ pub async fn describe_table(
 
 #[tauri::command]
 pub async fn run_sql(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     conn_id: String,
     db: Option<String>,
     sql: String,
@@ -211,155 +155,97 @@ pub async fn run_sql(
 
 #[tauri::command]
 pub fn load_scratch(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     console_id: String,
 ) -> Result<String, DataSourceError> {
-    let s = state.lock().unwrap();
-    Ok(s.scratches.get(&console_id).cloned().unwrap_or_default())
+    state.lock().unwrap().load_scratch(&console_id)
 }
 
 #[tauri::command]
 pub fn save_scratch(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     console_id: String,
     content: String,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    s.scratches.insert(console_id, content);
-    Ok(())
+    state.lock().unwrap().save_scratch(&console_id, &content)
 }
 
 // ── Consoles ────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn list_consoles(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
 ) -> Result<Vec<Console>, DataSourceError> {
-    let s = state.lock().unwrap();
-    Ok(s.consoles.clone())
+    state.lock().unwrap().list_consoles()
 }
 
 #[tauri::command]
 pub fn create_console(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     input: CreateConsoleInput,
 ) -> Result<Console, DataSourceError> {
-    let mut s = state.lock().unwrap();
-    let name = match input.name {
-        Some(n) => n,
-        None => crate::datasource::mock::MockBackend::next_console_name(
-            &s,
-            &input.connection_id,
-        ),
-    };
-    let created = Console {
-        id: nanoid::nanoid!(),
-        name,
-        connection_id: input.connection_id,
-        current_db: None,
-        created_at: now_millis(),
-    };
-    s.consoles.push(created.clone());
-    Ok(created)
+    let now = now_millis();
+    state.lock().unwrap().create_console(input, now)
 }
 
 #[tauri::command]
 pub fn rename_console(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     id: String,
     name: String,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    let target_idx = s
-        .consoles
-        .iter()
-        .position(|c| c.id == id)
-        .ok_or_else(|| DataSourceError::NotFound(format!("Console not found: {}", id)))?;
-    let target_conn = s.consoles[target_idx].connection_id.clone();
-    if s.consoles[target_idx].name == name {
-        return Ok(());
-    }
-    let clash = s
-        .consoles
-        .iter()
-        .any(|c| c.id != id && c.connection_id == target_conn && c.name == name);
-    if clash {
-        return Err(DataSourceError::AlreadyExists(format!(
-            "Console name '{}' already exists",
-            name
-        )));
-    }
-    s.consoles[target_idx].name = name;
-    Ok(())
+    state.lock().unwrap().rename_console(&id, &name)
 }
 
 #[tauri::command]
 pub fn update_console_db(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     id: String,
     db: Option<String>,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    let idx = s
-        .consoles
-        .iter()
-        .position(|c| c.id == id)
-        .ok_or_else(|| DataSourceError::NotFound(format!("Console not found: {}", id)))?;
-    s.consoles[idx].current_db = db;
-    Ok(())
+    state.lock().unwrap().update_console_db(&id, db.as_deref())
 }
 
 #[tauri::command]
 pub fn delete_console(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     id: String,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    s.consoles.retain(|c| c.id != id);
-    s.scratches.remove(&id);
-    s.results.remove(&id);
-    s.histories.remove(&id);
-    Ok(())
+    state.lock().unwrap().delete_console(&id)
 }
 
 // ── Result + history ────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn load_result(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     console_id: String,
 ) -> Result<Option<QueryResult>, DataSourceError> {
-    let s = state.lock().unwrap();
-    Ok(s.results.get(&console_id).cloned())
+    state.lock().unwrap().load_result(&console_id)
 }
 
 #[tauri::command]
 pub fn save_result(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     console_id: String,
     result: QueryResult,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    s.results.insert(console_id, result);
-    Ok(())
+    state.lock().unwrap().save_result(&console_id, &result)
 }
 
 #[tauri::command]
 pub fn load_history(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     console_id: String,
 ) -> Result<Vec<HistoryEntry>, DataSourceError> {
-    let s = state.lock().unwrap();
-    Ok(s.histories.get(&console_id).cloned().unwrap_or_default())
+    state.lock().unwrap().load_history(&console_id)
 }
 
 #[tauri::command]
 pub fn save_history(
-    state: State<'_, Mutex<MockState>>,
+    state: State<'_, Mutex<Store>>,
     console_id: String,
     entries: Vec<HistoryEntry>,
 ) -> Result<(), DataSourceError> {
-    let mut s = state.lock().unwrap();
-    s.histories.insert(console_id, entries);
-    Ok(())
+    state.lock().unwrap().save_history(&console_id, &entries)
 }

@@ -1,12 +1,31 @@
+use std::path::PathBuf;
+
+use tauri::Manager;
+
 pub mod commands;
 pub mod datasource;
+
+fn resolve_db_path(
+    app: &tauri::AppHandle,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if let Ok(override_path) = std::env::var("TAOSCOPE_DB_PATH") {
+        return Ok(PathBuf::from(override_path));
+    }
+    let dir = app.path().app_data_dir()?;
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir.join("taoscope.db"))
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(std::sync::Mutex::new(
-            crate::datasource::state::MockState::with_seed(),
-        ))
+        .setup(|app| {
+            let db_path = resolve_db_path(app.handle())?;
+            let store = crate::datasource::state::Store::open(&db_path)
+                .expect("failed to open SQLite database");
+            app.manage(std::sync::Mutex::new(store));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::list_connections,
             commands::test_connection,

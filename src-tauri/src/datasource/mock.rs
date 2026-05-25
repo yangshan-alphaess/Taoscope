@@ -15,7 +15,7 @@ use rand::Rng;
 use regex::Regex;
 use serde_json::Value as JsonValue;
 
-use crate::datasource::state::MockState;
+use crate::datasource::state::Store;
 use crate::datasource::types::{
     Column, Connection, ConnectionInput, ConnectionStatus, Database,
     ListTablesOpts, Paged, QueryResult, STable, Table, TestConnectionResult,
@@ -383,14 +383,10 @@ fn build_demo_rows(n: u32) -> Vec<Vec<JsonValue>> {
 pub struct MockBackend;
 
 impl MockBackend {
-    pub fn list_databases(state: &MockState, conn_id: &str) -> Vec<Database> {
-        if let Some(conn) = state.connections.iter().find(|c| c.id == conn_id) {
-            if matches!(conn.status, ConnectionStatus::Offline) {
-                return vec![];
-            }
-            return online_databases();
-        }
-        vec![]
+    pub fn list_databases(_state: &Store, _conn_id: &str) -> Vec<Database> {
+        // Legacy mock helper retained for dev fallback only; the live path
+        // routes through http_client::list_databases.
+        online_databases()
     }
 
     pub fn list_stables(_conn_id: &str, db: &str) -> Vec<STable> {
@@ -570,22 +566,9 @@ impl MockBackend {
         }
     }
 
-    /// Find the next auto-name "Console #N" for a given connection.
-    pub fn next_console_name(state: &MockState, conn_id: &str) -> String {
-        let re = Regex::new(r"^Console #(\d+)$").unwrap();
-        let mut max: u32 = 0;
-        for c in &state.consoles {
-            if c.connection_id != conn_id {
-                continue;
-            }
-            if let Some(cap) = re.captures(&c.name) {
-                if let Some(n) = cap.get(1).and_then(|m| m.as_str().parse::<u32>().ok()) {
-                    if n > max {
-                        max = n;
-                    }
-                }
-            }
-        }
-        format!("Console #{}", max + 1)
+    /// Legacy mock helper; the live path uses `Store::next_console_name`
+    /// which reads the SQLite-backed consoles table.
+    pub fn next_console_name(_state: &Store, _conn_id: &str) -> String {
+        "Console #1".to_string()
     }
 }
