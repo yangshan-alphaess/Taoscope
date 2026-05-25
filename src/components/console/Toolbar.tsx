@@ -1,9 +1,11 @@
 import { Play, Square, WandSparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFormatActiveConsole } from "./useFormatActiveConsole";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 
 export function Toolbar() {
   const { canRun, isRunning, run } = useRunActiveConsole();
+  const { canFormat, format } = useFormatActiveConsole();
 
   return (
     <div className="border-border bg-background flex h-9 shrink-0 items-center gap-1 border-b px-2">
@@ -15,7 +17,8 @@ export function Toolbar() {
         primary
       />
       <ToolbarButton
-        disabled
+        onClick={format}
+        disabled={!canFormat}
         icon={<WandSparkles className="h-3.5 w-3.5" />}
         label="Format"
       />
