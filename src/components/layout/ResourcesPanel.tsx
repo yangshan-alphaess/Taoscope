@@ -28,6 +28,11 @@ import { cn } from "@/lib/utils";
 import * as editorBridge from "@/components/console/editorBridge";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
 import { ConnectionFormDialog } from "@/components/layout/ConnectionFormDialog";
+import {
+  loadPersistedExpansion,
+  pruneByConnIds,
+  savePersistedExpansion,
+} from "@/components/layout/treeExpandPersist";
 import { confirm } from "@/components/ui/confirm";
 import {
   ContextMenu,
@@ -109,15 +114,20 @@ export function ResourcesPanel() {
     mode: "create",
   });
 
-  // Expansion sets keyed by path
-  const [expandedConns, setExpandedConns] = useState<Set<string>>(new Set());
-  const [expandedDbs, setExpandedDbs] = useState<Set<string>>(new Set());
+  // Expansion sets keyed by path (lazy-initialized from localStorage)
+  const [expandedConns, setExpandedConns] = useState<Set<string>>(
+    () => new Set(loadPersistedExpansion().conns),
+  );
+  const [expandedDbs, setExpandedDbs] = useState<Set<string>>(
+    () => new Set(loadPersistedExpansion().dbs),
+  );
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(
-    new Set(),
+    () => new Set(loadPersistedExpansion().columns),
   );
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(
-    new Set(),
+    () => new Set(loadPersistedExpansion().children),
   );
+  const [restored, setRestored] = useState(false);
 
   // Lazy caches
   const [dbsByConn, setDbsByConn] = useState<
@@ -146,6 +156,140 @@ export function ResourcesPanel() {
       cancelled = true;
     };
   }, [ds, connections.length, setConnections]);
+
+  // Persist expansion sets whenever any of them change.
+  useEffect(() => {
+    savePersistedExpansion({
+      conns: [...expandedConns],
+      dbs: [...expandedDbs],
+      columns: [...expandedColumns],
+      children: [...expandedChildren],
+    });
+  }, [expandedConns, expandedDbs, expandedColumns, expandedChildren]);
+
+  // One-shot restore: after connections load, prune stale connId-prefixed keys
+  // and refetch the data needed to render the persisted expanded paths.
+  useEffect(() => {
+    if (restored) return;
+    if (connections.length === 0) return;
+
+    const valid = new Set(connections.map((c) => c.id));
+
+    const cleanConns = pruneByConnIds([...expandedConns], valid);
+    const cleanDbs = pruneByConnIds([...expandedDbs], valid);
+    const cleanColumns = pruneByConnIds([...expandedColumns], valid);
+    const cleanChildren = pruneByConnIds([...expandedChildren], valid);
+
+    if (cleanConns.length !== expandedConns.size) {
+      setExpandedConns(new Set(cleanConns));
+    }
+    if (cleanDbs.length !== expandedDbs.size) {
+      setExpandedDbs(new Set(cleanDbs));
+    }
+    if (cleanColumns.length !== expandedColumns.size) {
+      setExpandedColumns(new Set(cleanColumns));
+    }
+    if (cleanChildren.length !== expandedChildren.size) {
+      setExpandedChildren(new Set(cleanChildren));
+    }
+
+    // Refetch in parallel — each fetch guards against duplicate work by
+    // checking the corresponding cache before writing.
+    for (const connId of cleanConns) {
+      const conn = connections.find((c) => c.id === connId);
+      if (!conn || conn.status !== "online") continue;
+      if (dbsByConn[connId]) continue;
+      setDbsByConn((prev) => ({ ...prev, [connId]: "loading" }));
+      ds.listDatabases(connId)
+        .then((list) => {
+          setDbsByConn((prev) => ({ ...prev, [connId]: list }));
+        })
+        .catch(() => {
+          setDbsByConn((prev) => ({ ...prev, [connId]: [] }));
+        });
+    }
+    for (const key of cleanDbs) {
+      if (stablesByDb[key] || tablesByDb[key]) continue;
+      const [connId, db] = key.split("|");
+      if (!connId || !db) continue;
+      const conn = connections.find((c) => c.id === connId);
+      if (!conn || conn.status !== "online") continue;
+      setStablesByDb((prev) => ({ ...prev, [key]: "loading" }));
+      setTablesByDb((prev) => ({ ...prev, [key]: "loading" }));
+      Promise.all([
+        ds.listSTables(connId, db),
+        ds.listTables(connId, db, { page: 1, pageSize: 200 }),
+      ])
+        .then(([stbs, paged]) => {
+          setStablesByDb((prev) => ({ ...prev, [key]: stbs }));
+          setTablesByDb((prev) => ({ ...prev, [key]: paged.items }));
+        })
+        .catch(() => {
+          setStablesByDb((prev) => ({ ...prev, [key]: [] }));
+          setTablesByDb((prev) => ({ ...prev, [key]: [] }));
+        });
+    }
+    for (const key of cleanColumns) {
+      if (columnsByTable[key]) continue;
+      const [connId, db, table] = key.split("|");
+      if (!connId || !db || !table) continue;
+      setColumnsByTable((prev) => ({ ...prev, [key]: "loading" }));
+      ds.describeTable(connId, db, table)
+        .then((cols) => {
+          setColumnsByTable((prev) => ({ ...prev, [key]: cols }));
+        })
+        .catch(() => {
+          setColumnsByTable((prev) => ({ ...prev, [key]: "error" }));
+        });
+    }
+    for (const key of cleanChildren) {
+      if (childrenByStable[key]) continue;
+      const [connId, db, stable] = key.split("|");
+      if (!connId || !db || !stable) continue;
+      setChildrenByStable((prev) => ({
+        ...prev,
+        [key]: {
+          items: [],
+          total: 0,
+          nextPage: 1,
+          loading: true,
+          error: null,
+        },
+      }));
+      ds.listTables(connId, db, {
+        stable,
+        page: 1,
+        pageSize: CHILD_PAGE_SIZE,
+      })
+        .then((paged) => {
+          setChildrenByStable((prev) => ({
+            ...prev,
+            [key]: {
+              items: paged.items,
+              total: paged.total,
+              nextPage: 2,
+              loading: false,
+              error: null,
+            },
+          }));
+        })
+        .catch(() => {
+          setChildrenByStable((prev) => ({
+            ...prev,
+            [key]: {
+              items: [],
+              total: 0,
+              nextPage: 1,
+              loading: false,
+              error: "Failed to load. Retry?",
+            },
+          }));
+        });
+    }
+
+    setRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections, restored]);
 
   // Filter-induced auto-expansion: when filter is active, every loaded level
   // is visible regardless of explicit expansion state.
