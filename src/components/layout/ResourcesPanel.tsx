@@ -1001,7 +1001,7 @@ function ConnectionBody({
                 <ContextMenuItem
                   onSelect={() => onCreateConsoleInDb(conn.id, db.name)}
                 >
-                  New Console bound to {db.name}
+                  New Console
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
