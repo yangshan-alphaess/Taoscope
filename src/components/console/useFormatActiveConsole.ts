@@ -1,13 +1,6 @@
-import { format as formatSql } from "sql-formatter";
 import { toast } from "sonner";
 import { useAppState } from "@/store/appState";
-
-const FORMAT_OPTIONS = {
-  language: "mysql" as const,
-  tabWidth: 2,
-  keywordCase: "upper" as const,
-  linesBetweenQueries: 1,
-};
+import { formatScratch } from "./formatScratch";
 
 export interface UseFormatActiveConsoleResult {
   canFormat: boolean;
@@ -26,12 +19,11 @@ export function useFormatActiveConsole(): UseFormatActiveConsoleResult {
 
   function format() {
     if (!canFormat || !activeConsoleId || !runtime) return;
-    try {
-      const formatted = formatSql(runtime.scratch, FORMAT_OPTIONS);
-      setScratch(activeConsoleId, formatted);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to format SQL: ${message.slice(0, 100)}`);
+    const result = formatScratch(runtime.scratch);
+    if (result.ok) {
+      setScratch(activeConsoleId, result.formatted);
+    } else {
+      toast.error(`Failed to format SQL: ${result.message}`);
     }
   }
 

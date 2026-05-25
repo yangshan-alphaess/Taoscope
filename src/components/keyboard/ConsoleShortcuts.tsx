@@ -1,8 +1,13 @@
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 
+import { formatScratch } from "@/components/console/formatScratch";
 import { useDataSource } from "@/datasource/context";
 import type { DataSource } from "@/datasource/types";
-import { useAppState } from "@/store/appState";
+import {
+  useAppState,
+  type ConsoleRuntimeEntry,
+} from "@/store/appState";
 import type { Connection, Console } from "@/datasource/types";
 import { confirm } from "@/components/ui/confirm";
 
@@ -10,10 +15,12 @@ interface ShortcutState {
   consoles: Console[];
   activeConsoleId: string | null;
   connections: Connection[];
+  consoleRuntime: Record<string, ConsoleRuntimeEntry>;
   ds: DataSource;
   addConsole: (c: Console) => void;
   setActiveConsole: (id: string | null) => void;
   removeConsole: (id: string) => void;
+  setScratch: (id: string, scratch: string) => void;
 }
 
 export function ConsoleShortcuts() {
@@ -21,18 +28,22 @@ export function ConsoleShortcuts() {
   const consoles = useAppState((s) => s.consoles);
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const connections = useAppState((s) => s.connections);
+  const consoleRuntime = useAppState((s) => s.consoleRuntime);
   const addConsole = useAppState((s) => s.addConsole);
   const setActiveConsole = useAppState((s) => s.setActiveConsole);
   const removeConsole = useAppState((s) => s.removeConsole);
+  const setScratch = useAppState((s) => s.setScratch);
 
   const stateRef = useRef<ShortcutState>({
     consoles,
     activeConsoleId,
     connections,
+    consoleRuntime,
     ds,
     addConsole,
     setActiveConsole,
     removeConsole,
+    setScratch,
   });
 
   useEffect(() => {
@@ -40,10 +51,12 @@ export function ConsoleShortcuts() {
       consoles,
       activeConsoleId,
       connections,
+      consoleRuntime,
       ds,
       addConsole,
       setActiveConsole,
       removeConsole,
+      setScratch,
     };
   });
 
@@ -52,9 +65,26 @@ export function ConsoleShortcuts() {
       const modOn = e.metaKey || e.ctrlKey;
       const bothMod = e.metaKey && e.ctrlKey;
       if (!modOn || bothMod) return;
-      if (e.shiftKey || e.altKey) return;
+      if (e.altKey) return;
 
       const s = stateRef.current;
+
+      if (e.shiftKey && (e.key === "f" || e.key === "F")) {
+        e.preventDefault();
+        const { activeConsoleId, consoleRuntime, setScratch } = s;
+        if (!activeConsoleId) return;
+        const runtime = consoleRuntime[activeConsoleId];
+        if (!runtime || runtime.scratch.trim().length === 0) return;
+        const result = formatScratch(runtime.scratch);
+        if (result.ok) {
+          setScratch(activeConsoleId, result.formatted);
+        } else {
+          toast.error(`Failed to format SQL: ${result.message}`);
+        }
+        return;
+      }
+
+      if (e.shiftKey) return;
 
       if (/^[1-9]$/.test(e.key)) {
         e.preventDefault();
