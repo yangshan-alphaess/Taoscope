@@ -34,33 +34,34 @@
   }
 
   .dark {
-    /* Linear/Vercel-ish dark theme. Background slightly cool, low contrast neutrals. */
-    --background: 240 6% 7%;
-    --foreground: 240 5% 96%;
+    /* Soft warm-neutral dark theme — Claude / VS Code style. Avoids pure
+       black; surfaces are mid-grey with a faint blue undertone so the eye
+       reads it as "dark UI" rather than "OLED off pixel". */
+    --background: 220 6% 13%;      /* ~#1f2022 */
+    --foreground: 220 8% 90%;      /* off-white, easier on eyes than pure white */
 
-    --card: 240 6% 9%;
-    --card-foreground: 240 5% 96%;
+    --card: 220 6% 16%;            /* surfaces a notch above bg */
+    --card-foreground: 220 8% 90%;
 
-    /* Popover: slightly brighter than card so floating menus feel elevated
-       without an aggressive white border. */
-    --popover: 240 6% 11%;
-    --popover-foreground: 240 5% 96%;
+    /* Popover: slightly brighter than card so floating menus feel elevated. */
+    --popover: 220 6% 19%;
+    --popover-foreground: 220 8% 92%;
 
-    --primary: 164 93% 38%; /* slightly brighter #06A77D for dark bg */
-    --primary-foreground: 240 6% 7%;
+    --primary: 164 75% 45%;        /* #06A77D family, dialed down for soft bg */
+    --primary-foreground: 220 6% 13%;
 
-    --muted: 240 5% 14%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 220 6% 21%;           /* hover / row-active */
+    --muted-foreground: 220 6% 65%;
 
-    --accent: 240 5% 14%;
-    --accent-foreground: 240 5% 96%;
+    --accent: 220 6% 21%;
+    --accent-foreground: 220 8% 92%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 65% 56%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 5% 16%;
-    --input: 240 5% 16%;
-    --ring: 164 93% 38%;
+    --border: 220 6% 26%;          /* visible but unobtrusive */
+    --input: 220 6% 26%;
+    --ring: 164 75% 48%;
   }
 
   html,
@@ -69,8 +70,26 @@
     height: 100%;
   }
 
+  /* Bump the root font-size by ~6% so all rem-based text scales up a hair
+     without forcing per-component edits. text-xs becomes ~13px, text-sm
+     ~15px — noticeably less squinty without breaking layouts. */
+  html {
+    font-size: 17px;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     overflow: hidden; /* desktop app: never scroll the window itself */
+  }
+
+  /* The two arbitrary-value tiny-text utilities in the codebase (chips /
+     timestamps) also get nudged so they don't lag behind the rem bump. */
+  .text-\[10px\] {
+    font-size: 11px;
+    line-height: 14px;
+  }
+  .text-\[11px\] {
+    font-size: 12px;
+    line-height: 15px;
   }
 }
