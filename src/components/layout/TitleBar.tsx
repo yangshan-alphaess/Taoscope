@@ -68,17 +68,30 @@ export function TitleBar() {
         isMac && "pl-20",
       )}
     >
-      <div data-tauri-drag-region className="flex items-center gap-2">
-        <div className="bg-primary h-3 w-3 rounded-sm" aria-hidden />
-        <span className="text-sm font-medium">Taoscope</span>
+      <div
+        data-tauri-drag-region
+        className={cn(
+          "flex items-center gap-2",
+          // Nudge text-bearing groups down 2px so the glyph midline matches
+          // the macOS traffic-light center (AppKit overlays them at a fixed
+          // offset that's slightly below our flex-centered position).
+          isMac && "mt-[4px]",
+        )}
+      >
+        <span className="text-sm font-medium leading-none">Taoscope</span>
       </div>
 
       <div
         data-tauri-drag-region
-        className="flex flex-1 items-center justify-center gap-2"
+        className={cn(
+          "flex flex-1 items-center justify-center gap-2",
+          isMac && "mt-[2px]",
+        )}
       >
-        <span className="text-muted-foreground text-xs">conn:</span>
-        <span className="text-foreground font-mono text-xs">
+        <span className="text-muted-foreground text-xs leading-none">
+          conn:
+        </span>
+        <span className="text-foreground font-mono text-xs leading-none">
           {currentConn ? currentConn.name : "—"}
         </span>
         {currentConn && (

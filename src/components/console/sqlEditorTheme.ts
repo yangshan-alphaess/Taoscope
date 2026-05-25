@@ -12,7 +12,7 @@ export const taoscopeEditorTheme = EditorView.theme(
     },
     ".cm-content": {
       fontFamily: "var(--font-mono, ui-monospace, monospace)",
-      fontSize: "12px",
+      fontSize: "13px",
       padding: "8px 0",
       caretColor: "hsl(var(--primary))",
     },
@@ -20,6 +20,8 @@ export const taoscopeEditorTheme = EditorView.theme(
       backgroundColor: "hsl(var(--card))",
       color: "hsl(var(--muted-foreground))",
       borderRight: "1px solid hsl(var(--border))",
+      fontFamily: "var(--font-mono, ui-monospace, monospace)",
+      fontSize: "13px",
     },
     ".cm-lineNumbers .cm-gutterElement": {
       paddingLeft: "12px",

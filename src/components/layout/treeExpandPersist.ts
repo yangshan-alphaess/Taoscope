@@ -3,6 +3,7 @@ export const TREE_EXPAND_STORAGE_KEY = "taoscope.tree.expanded";
 export interface PersistedExpansion {
   conns: string[];
   dbs: string[];
+  tables: string[];
   columns: string[];
   children: string[];
 }
@@ -10,6 +11,7 @@ export interface PersistedExpansion {
 const EMPTY: PersistedExpansion = {
   conns: [],
   dbs: [],
+  tables: [],
   columns: [],
   children: [],
 };
@@ -29,7 +31,9 @@ export function loadPersistedExpansion(): PersistedExpansion {
     ) {
       return EMPTY;
     }
-    return parsed as PersistedExpansion;
+    const p = parsed as Partial<PersistedExpansion> & PersistedExpansion;
+    // `tables` was added later — older entries don't have it.
+    return { ...p, tables: Array.isArray(p.tables) ? p.tables : [] };
   } catch {
     return EMPTY;
   }

@@ -166,20 +166,21 @@ export function ConnectionFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-md gap-3 p-4 rounded-md">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-sm font-semibold">
             {mode === "create" ? "New Connection" : "Edit Connection"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 py-2">
+        <div className="grid gap-2.5 py-1">
           <Field label="Name" error={errors.name}>
             <Input
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
               placeholder="my-connection"
               autoFocus
+              className={inputClass}
             />
           </Field>
           <Field label="Host" error={errors.host}>
@@ -187,6 +188,7 @@ export function ConnectionFormDialog({
               value={form.host}
               onChange={(e) => update("host", e.target.value)}
               placeholder="tdengine.example.com"
+              className={inputClass}
             />
           </Field>
           <Field label="Port" error={errors.port}>
@@ -196,12 +198,14 @@ export function ConnectionFormDialog({
               onChange={(e) =>
                 update("port", Number.parseInt(e.target.value, 10) || 0)
               }
+              className={inputClass}
             />
           </Field>
           <Field label="User" error={errors.user}>
             <Input
               value={form.user}
               onChange={(e) => update("user", e.target.value)}
+              className={inputClass}
             />
           </Field>
           <Field label="Password" error={errors.password}>
@@ -212,6 +216,7 @@ export function ConnectionFormDialog({
               placeholder={
                 mode === "edit" ? "Leave empty to keep current" : ""
               }
+              className={inputClass}
             />
           </Field>
         </div>
@@ -235,15 +240,17 @@ export function ConnectionFormDialog({
             variant="outline"
             onClick={handleTest}
             disabled={busy !== null}
+            className={btnClass}
           >
             {busy === "test" ? "Testing…" : "Test"}
           </Button>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <Button
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={busy === "save"}
+              className={btnClass}
             >
               Cancel
             </Button>
@@ -251,6 +258,7 @@ export function ConnectionFormDialog({
               type="button"
               onClick={handleSave}
               disabled={hasErrors || busy !== null}
+              className={btnClass}
             >
               {busy === "save" ? "Saving…" : "Save"}
             </Button>
@@ -260,6 +268,12 @@ export function ConnectionFormDialog({
     </Dialog>
   );
 }
+
+// Compact form-control styling shared by every input + button in this dialog,
+// matching the density of the right-click context menu elsewhere in the app.
+const inputClass =
+  "h-8 rounded px-2.5 text-xs md:text-xs focus-visible:ring-1 focus-visible:ring-offset-0";
+const btnClass = "h-8 rounded px-3 text-xs";
 
 function Field({
   label,
