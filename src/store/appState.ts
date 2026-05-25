@@ -30,21 +30,9 @@ const DEFAULT_RUNTIME: ConsoleRuntimeEntry = {
 };
 
 interface AppState {
-  // Connections (cached after first fetch; shared by Sidebar and TitleBar).
   connections: Connection[];
   setConnections: (connections: Connection[]) => void;
 
-  // Current selection: which connection's schema is being browsed.
-  currentConnectionId: string | null;
-  setConnection: (id: string | null) => void;
-
-  // Which database the SchemaPanel has expanded. Pure UI state — does NOT
-  // drive SQL execution; only used so the "New Console" action can default
-  // a new console's currentDb to whatever the user is currently browsing.
-  schemaBrowsingDb: string | null;
-  setSchemaBrowsingDb: (db: string | null) => void;
-
-  // Console workspace.
   consoles: Console[];
   setConsoles: (list: Console[]) => void;
   addConsole: (c: Console) => void;
@@ -52,10 +40,7 @@ interface AppState {
   renameConsoleLocal: (id: string, name: string) => void;
   setConsoleDbLocal: (id: string, db: string | null) => void;
 
-  openConsoleIds: string[];
   activeConsoleId: string | null;
-  openConsole: (id: string) => void;
-  closeConsole: (id: string) => void;
   setActiveConsole: (id: string | null) => void;
 
   consoleRuntime: Record<string, ConsoleRuntimeEntry>;
@@ -70,29 +55,9 @@ interface AppState {
   setGridState: (id: string, state: GridState) => void;
 }
 
-/** Pick a neighbor id in the openConsoleIds list when closing/deleting `id`. */
-function pickNeighbor(list: string[], id: string): string | null {
-  const idx = list.indexOf(id);
-  if (idx === -1) return null;
-  if (list.length === 1) return null;
-  // Prefer the element after, else the element before.
-  return list[idx + 1] ?? list[idx - 1] ?? null;
-}
-
 export const useAppState = create<AppState>((set) => ({
   connections: [],
   setConnections: (connections) => set({ connections }),
-
-  currentConnectionId: null,
-  setConnection: (id) =>
-    set((state) =>
-      id === state.currentConnectionId
-        ? state
-        : { currentConnectionId: id, schemaBrowsingDb: null },
-    ),
-
-  schemaBrowsingDb: null,
-  setSchemaBrowsingDb: (db) => set({ schemaBrowsingDb: db }),
 
   consoles: [],
   setConsoles: (list) => set({ consoles: list }),
@@ -101,14 +66,11 @@ export const useAppState = create<AppState>((set) => ({
   removeConsole: (id) =>
     set((state) => {
       const consoles = state.consoles.filter((c) => c.id !== id);
-      const openConsoleIds = state.openConsoleIds.filter((x) => x !== id);
-      let activeConsoleId = state.activeConsoleId;
-      if (activeConsoleId === id) {
-        activeConsoleId = pickNeighbor(state.openConsoleIds, id);
-      }
+      const activeConsoleId =
+        state.activeConsoleId === id ? null : state.activeConsoleId;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { [id]: _dropped, ...consoleRuntime } = state.consoleRuntime;
-      return { consoles, openConsoleIds, activeConsoleId, consoleRuntime };
+      return { consoles, activeConsoleId, consoleRuntime };
     }),
   renameConsoleLocal: (id, name) =>
     set((state) => ({
@@ -123,28 +85,7 @@ export const useAppState = create<AppState>((set) => ({
       ),
     })),
 
-  openConsoleIds: [],
   activeConsoleId: null,
-  openConsole: (id) =>
-    set((state) => {
-      if (state.openConsoleIds.includes(id)) {
-        return { activeConsoleId: id };
-      }
-      return {
-        openConsoleIds: [...state.openConsoleIds, id],
-        activeConsoleId: id,
-      };
-    }),
-  closeConsole: (id) =>
-    set((state) => {
-      if (!state.openConsoleIds.includes(id)) return state;
-      const openConsoleIds = state.openConsoleIds.filter((x) => x !== id);
-      let activeConsoleId = state.activeConsoleId;
-      if (activeConsoleId === id) {
-        activeConsoleId = pickNeighbor(state.openConsoleIds, id);
-      }
-      return { openConsoleIds, activeConsoleId };
-    }),
   setActiveConsole: (id) => set({ activeConsoleId: id }),
 
   consoleRuntime: {},

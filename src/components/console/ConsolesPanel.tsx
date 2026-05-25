@@ -18,14 +18,13 @@ export function ConsolesPanel() {
   const connections = useAppState((s) => s.connections);
   const consoles = useAppState((s) => s.consoles);
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
-  const openConsole = useAppState((s) => s.openConsole);
-  const closeConsole = useAppState((s) => s.closeConsole);
+  const setActiveConsole = useAppState((s) => s.setActiveConsole);
   const removeConsole = useAppState((s) => s.removeConsole);
   const renameConsoleLocal = useAppState((s) => s.renameConsoleLocal);
   const createConsole = useCreateConsole();
 
-  // Per-connection collapse state. Default: all expanded.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   function toggleCollapse(connId: string) {
     setCollapsed((prev) => {
@@ -56,7 +55,7 @@ export function ConsolesPanel() {
   }
 
   return (
-    <section className="bg-background border-border flex w-[26rem] shrink-0 flex-col border-r">
+    <section className="bg-background flex h-full min-h-0 flex-col">
       <div className="border-border flex h-9 shrink-0 items-center border-b px-3">
         <h2 className="text-xs font-semibold tracking-wide uppercase">
           Consoles
@@ -132,7 +131,9 @@ export function ConsolesPanel() {
                           <ContextMenu key={c.id}>
                             <ContextMenuTrigger asChild>
                               <div
-                                onClick={() => openConsole(c.id)}
+                                onClick={() => {
+                                  if (!isActive) setActiveConsole(c.id);
+                                }}
                                 className={cn(
                                   "group hover:bg-muted/40 flex cursor-pointer items-center gap-2 px-2 py-1",
                                   isActive
@@ -151,7 +152,15 @@ export function ConsolesPanel() {
                                 />
                                 <RenamableLabel
                                   value={c.name}
-                                  onRename={(next) => handleRename(c.id, next)}
+                                  startEditing={renamingId === c.id}
+                                  onEditingChange={(editing) => {
+                                    if (!editing && renamingId === c.id) {
+                                      setRenamingId(null);
+                                    }
+                                  }}
+                                  onRename={(next) =>
+                                    handleRename(c.id, next)
+                                  }
                                 />
                                 <span className="text-muted-foreground/60 ml-auto font-mono text-[10px]">
                                   {c.currentDb ?? "—"}
@@ -171,34 +180,9 @@ export function ConsolesPanel() {
                             </ContextMenuTrigger>
                             <ContextMenuContent>
                               <ContextMenuItem
-                                onSelect={() => {
-                                  const next = window.prompt(
-                                    "Rename console",
-                                    c.name,
-                                  );
-                                  if (
-                                    !next ||
-                                    next.trim() === "" ||
-                                    next === c.name
-                                  )
-                                    return;
-                                  void handleRename(c.id, next.trim()).catch(
-                                    (err) => {
-                                      window.alert(
-                                        err instanceof Error
-                                          ? err.message
-                                          : "Rename failed",
-                                      );
-                                    },
-                                  );
-                                }}
+                                onSelect={() => setRenamingId(c.id)}
                               >
                                 Rename
-                              </ContextMenuItem>
-                              <ContextMenuItem
-                                onSelect={() => closeConsole(c.id)}
-                              >
-                                Close tab
                               </ContextMenuItem>
                               <ContextMenuItem
                                 onSelect={() => {

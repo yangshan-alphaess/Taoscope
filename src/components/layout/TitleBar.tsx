@@ -3,11 +3,16 @@ import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
 
 export function TitleBar() {
+  const activeConsoleId = useAppState((s) => s.activeConsoleId);
+  const consoles = useAppState((s) => s.consoles);
   const connections = useAppState((s) => s.connections);
-  const currentConnectionId = useAppState((s) => s.currentConnectionId);
 
-  const currentConn =
-    connections.find((c) => c.id === currentConnectionId) ?? null;
+  const activeConsole = activeConsoleId
+    ? (consoles.find((c) => c.id === activeConsoleId) ?? null)
+    : null;
+  const currentConn = activeConsole
+    ? (connections.find((c) => c.id === activeConsole.connectionId) ?? null)
+    : null;
 
   return (
     <div

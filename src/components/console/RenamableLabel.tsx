@@ -3,20 +3,20 @@ import { cn } from "@/lib/utils";
 
 interface RenamableLabelProps {
   value: string;
-  /**
-   * Persist the rename. Reject with an Error to indicate a name conflict;
-   * the component then keeps the input open and shows a visual error cue.
-   */
   onRename: (next: string) => Promise<void>;
-  /** Optional className for the displayed label (not the input). */
+  /** When true, force the input into editing mode (e.g., from a Rename menu item). */
+  startEditing?: boolean;
+  /** Notify parent when editing state transitions, so it can clear its trigger. */
+  onEditingChange?: (editing: boolean) => void;
   className?: string;
-  /** Optional className for the input box (default size styles applied). */
   inputClassName?: string;
 }
 
 export function RenamableLabel({
   value,
   onRename,
+  startEditing,
+  onEditingChange,
   className,
   inputClassName,
 }: RenamableLabelProps) {
@@ -25,12 +25,21 @@ export function RenamableLabel({
   const [hasError, setHasError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keep draft in sync with external value while not editing.
   useEffect(() => {
     if (!editing) setDraft(value);
   }, [value, editing]);
 
-  // Focus and select on enter-edit.
+  useEffect(() => {
+    if (startEditing && !editing) {
+      setEditing(true);
+      setDraft(value);
+    }
+  }, [startEditing, editing, value]);
+
+  useEffect(() => {
+    onEditingChange?.(editing);
+  }, [editing, onEditingChange]);
+
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
@@ -52,7 +61,6 @@ export function RenamableLabel({
       setHasError(false);
     } catch {
       setHasError(true);
-      // keep input open
     }
   }
 
