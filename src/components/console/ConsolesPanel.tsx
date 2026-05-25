@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
@@ -170,10 +170,23 @@ export function ConsolesPanel() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    void handleDelete(c.id);
+                                    setRenamingId(c.id);
                                   }}
                                   className="hover:bg-muted ml-1 rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                                  aria-label="Rename console"
+                                  title="Rename console"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleDelete(c.id);
+                                  }}
+                                  className="hover:bg-muted rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
                                   aria-label="Delete console"
+                                  title="Delete console"
                                 >
                                   <X className="h-3 w-3" />
                                 </button>

@@ -33,6 +33,16 @@ function App() {
     };
   }, [dataSource, setConsoles]);
 
+  // Suppress the default browser context menu globally — the webview shouldn't
+  // expose "Inspect / View Source" in a desktop app. shadcn ContextMenu (Radix)
+  // calls preventDefault inside its own onContextMenu before this bubble-phase
+  // listener fires, so explicit triggers still open their menus.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => e.preventDefault();
+    window.addEventListener("contextmenu", handler);
+    return () => window.removeEventListener("contextmenu", handler);
+  }, []);
+
   return (
     <DataSourceProvider value={dataSource}>
       <div className="flex h-screen w-screen flex-col overflow-hidden">

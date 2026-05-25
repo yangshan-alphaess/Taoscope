@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CornerDownLeft,
   Database as DbIcon,
+  FilePlus,
   FileText,
   Layers,
   MoreHorizontal,
@@ -713,11 +714,12 @@ export function ResourcesPanel() {
         <button
           type="button"
           onClick={() => setDialogState({ open: true, mode: "create" })}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-sm p-1"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center gap-1 rounded-sm px-2 py-1 text-xs"
           aria-label="New connection"
           title="New connection"
         >
           <Plus className="h-3.5 w-3.5" />
+          <span>New connection</span>
         </button>
       </div>
 
@@ -987,6 +989,18 @@ function ConnectionBody({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      onCreateConsoleInDb(conn.id, db.name);
+                    }}
+                    className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible shrink-0 rounded-sm p-1 group-hover:visible"
+                    aria-label={`New console in ${db.name}`}
+                    title={`New console in ${db.name}`}
+                  >
+                    <FilePlus className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onRefreshDb(conn.id, db.name);
                     }}
                     className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
@@ -1102,7 +1116,6 @@ function DatabaseBody({
                   STable · {stb.childCount}
                 </span>
               </button>
-              <InsertButton name={stb.name} />
             </div>
             {colsOpen && (
               <ColumnDetail state={colsState} query={query} />
@@ -1153,7 +1166,6 @@ function DatabaseBody({
                   {highlight(t.name, query)}
                 </span>
               </button>
-              <InsertButton name={t.name} />
             </div>
             {open && <ColumnDetail state={colsState} query={query} />}
           </div>
@@ -1269,8 +1281,6 @@ function ChildList({
             title={t.name}
           >
             <span className="truncate">{highlight(t.name, query)}</span>
-            <span className="ml-auto" />
-            <InsertButton name={t.name} />
           </div>
         ))
       )}
