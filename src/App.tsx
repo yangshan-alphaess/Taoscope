@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { DataSourceProvider } from "@/datasource/context";
-import { MockDataSource } from "@/datasource/mock";
+import { createDataSource } from "@/datasource/factory";
 import { useAppState } from "@/store/appState";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { ResourcesPanel } from "@/components/layout/ResourcesPanel";
@@ -19,7 +19,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 
 function App() {
-  const dataSource = useMemo(() => new MockDataSource(), []);
+  const dataSource = useMemo(() => createDataSource(), []);
   const setConsoles = useAppState((s) => s.setConsoles);
 
   useEffect(() => {

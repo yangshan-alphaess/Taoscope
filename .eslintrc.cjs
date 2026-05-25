@@ -39,6 +39,11 @@ module.exports = {
                 message:
                   "Components must access DataSource via useDataSource(); do not import concrete implementations.",
               },
+              {
+                name: "@/datasource/tauri",
+                message:
+                  "Components must access DataSource via useDataSource(); do not import concrete implementations.",
+              },
             ],
           },
         ],
