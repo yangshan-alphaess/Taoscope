@@ -11,13 +11,22 @@ import {
   type Updater,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, X } from "lucide-react";
+import { toast } from "sonner";
 
 import type { Column, QueryResult } from "@/datasource/types";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/store/appState";
 import { formatCell, isNumericColumn } from "@/components/console/formatCell";
 import { ResultCell } from "@/components/console/ResultCell";
+import { columnToText } from "@/components/console/resultExport";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 const EMPTY_GRID_STATE = {
   sorting: [] as SortingState,
@@ -176,42 +185,106 @@ export function ResultGrid({ result }: { result: QueryResult }) {
             >
               {headerGroup.headers.map((header) => {
                 const sortDir = header.column.getIsSorted();
+                const colIdx = result.columns.findIndex(
+                  (c) => c.name === header.column.id,
+                );
+                const col =
+                  colIdx >= 0 ? result.columns[colIdx] : undefined;
+
+                function copyColumnName() {
+                  if (!col) return;
+                  navigator.clipboard
+                    .writeText(col.name)
+                    .then(() => toast.success(`Copied "${col.name}"`))
+                    .catch(() => toast.error("Failed to copy"));
+                }
+
+                function copyColumnValues() {
+                  if (!col || colIdx < 0) return;
+                  const text = columnToText(result.rows, colIdx, col);
+                  navigator.clipboard
+                    .writeText(text)
+                    .then(() =>
+                      toast.success(`Copied ${result.rows.length} values`),
+                    )
+                    .catch(() => toast.error("Failed to copy"));
+                }
+
                 return (
-                  <th
-                    key={header.id}
-                    className="bg-card hover:bg-muted/40 text-foreground border-border relative cursor-pointer border-r border-b px-2 py-1 text-left text-xs font-medium select-none last:border-r-0"
-                    style={{
-                      width: header.getSize(),
-                      flexShrink: 0,
-                    }}
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                      </span>
-                      {sortDir === "asc" && (
-                        <ChevronUp className="h-3 w-3 shrink-0" />
+                  <ContextMenu key={header.id}>
+                    <ContextMenuTrigger asChild>
+                      <th
+                        className="bg-card hover:bg-muted/40 text-foreground border-border relative cursor-pointer border-r border-b px-2 py-1 text-left text-xs font-medium select-none last:border-r-0"
+                        style={{
+                          width: header.getSize(),
+                          flexShrink: 0,
+                        }}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                          </span>
+                          {sortDir === "asc" && (
+                            <ChevronUp className="h-3 w-3 shrink-0" />
+                          )}
+                          {sortDir === "desc" && (
+                            <ChevronDown className="h-3 w-3 shrink-0" />
+                          )}
+                        </div>
+                        <div
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          onClick={(e) => e.stopPropagation()}
+                          onContextMenu={(e) => e.stopPropagation()}
+                          className={cn(
+                            "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none",
+                            header.column.getIsResizing()
+                              ? "bg-primary"
+                              : "hover:bg-primary/40",
+                          )}
+                        />
+                      </th>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onSelect={() => header.column.toggleSorting(false)}
+                      >
+                        <ArrowUp className="mr-2 h-3 w-3" />
+                        Sort ascending
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        onSelect={() => header.column.toggleSorting(true)}
+                      >
+                        <ArrowDown className="mr-2 h-3 w-3" />
+                        Sort descending
+                      </ContextMenuItem>
+                      {sortDir !== false && (
+                        <ContextMenuItem
+                          onSelect={() => header.column.clearSorting()}
+                        >
+                          <X className="mr-2 h-3 w-3" />
+                          Clear sort
+                        </ContextMenuItem>
                       )}
-                      {sortDir === "desc" && (
-                        <ChevronDown className="h-3 w-3 shrink-0" />
-                      )}
-                    </div>
-                    <div
-                      onMouseDown={header.getResizeHandler()}
-                      onTouchStart={header.getResizeHandler()}
-                      onClick={(e) => e.stopPropagation()}
-                      className={cn(
-                        "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none",
-                        header.column.getIsResizing()
-                          ? "bg-primary"
-                          : "hover:bg-primary/40",
-                      )}
-                    />
-                  </th>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onSelect={copyColumnName}
+                        disabled={!col}
+                      >
+                        Copy column name
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        onSelect={copyColumnValues}
+                        disabled={!col}
+                      >
+                        Copy column values
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 );
               })}
             </tr>

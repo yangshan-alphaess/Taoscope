@@ -54,6 +54,14 @@ export function rowToTsv(row: unknown[], columns: Column[]): string {
     .join("\t");
 }
 
+export function columnToText(
+  rows: unknown[][],
+  colIndex: number,
+  col: Column,
+): string {
+  return rows.map((row) => serializeValue(row[colIndex], col)).join("\n");
+}
+
 export function rowToJson(row: unknown[], columns: Column[]): string {
   const obj: Record<string, unknown> = {};
   columns.forEach((col, idx) => {
