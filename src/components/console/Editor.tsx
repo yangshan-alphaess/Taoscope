@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, placeholder } from "@codemirror/view";
-import { sql, MySQL } from "@codemirror/lang-sql";
+import { sql } from "@codemirror/lang-sql";
+import { TDengineDialect } from "./tdengineDialect";
 import {
   copyLineDown,
   defaultKeymap,
@@ -112,7 +113,7 @@ export function Editor() {
   }, [ds, activeConsoleId, runtime]);
 
   const extensions = useMemo(() => {
-    const sqlExt = sql({ dialect: MySQL });
+    const sqlExt = sql({ dialect: TDengineDialect });
     return [
       sqlExt,
       sqlExt.language.data.of({ autocomplete: sqlSource }),

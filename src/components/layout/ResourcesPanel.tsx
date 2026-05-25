@@ -391,6 +391,58 @@ export function ResourcesPanel() {
     }
   }
 
+  async function handleRefreshDatabase(connId: string, db: string) {
+    const key = `${connId}|${db}`;
+    // Wipe all caches scoped under this database; keep peer databases under
+    // the same connection untouched.
+    setStablesByDb((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setTablesByDb((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setColumnsByTable((prev) => {
+      const next: typeof prev = {};
+      for (const k of Object.keys(prev)) {
+        if (!k.startsWith(`${key}|`)) next[k] = prev[k]!;
+      }
+      return next;
+    });
+    setChildrenByStable((prev) => {
+      const next: typeof prev = {};
+      for (const k of Object.keys(prev)) {
+        if (!k.startsWith(`${key}|`)) next[k] = prev[k]!;
+      }
+      return next;
+    });
+    setExpandedDbs((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+    setStablesByDb((prev) => ({ ...prev, [key]: "loading" }));
+    setTablesByDb((prev) => ({ ...prev, [key]: "loading" }));
+    try {
+      const [stbs, paged] = await Promise.all([
+        ds.listSTables(connId, db),
+        ds.listTables(connId, db, { page: 1, pageSize: 200 }),
+      ]);
+      setStablesByDb((prev) => ({ ...prev, [key]: stbs }));
+      setTablesByDb((prev) => ({ ...prev, [key]: paged.items }));
+      toast.success(`Refreshed ${db}`);
+    } catch (err) {
+      setStablesByDb((prev) => ({ ...prev, [key]: [] }));
+      setTablesByDb((prev) => ({ ...prev, [key]: [] }));
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg);
+    }
+  }
+
   async function toggleConn(c: Connection) {
     const isOpen = expandedConns.has(c.id);
     setExpandedConns((prev) => {
@@ -811,6 +863,7 @@ export function ResourcesPanel() {
                     onToggleColumns={toggleColumns}
                     onToggleChildren={toggleChildren}
                     onLoadMore={loadMoreChildren}
+                    onRefreshDb={handleRefreshDatabase}
                   />
                 )}
               </div>
@@ -850,6 +903,7 @@ interface ConnectionBodyProps {
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMore: (connId: string, db: string, stable: string) => void;
+  onRefreshDb: (connId: string, db: string) => void;
 }
 
 function ConnectionBody({
@@ -868,6 +922,7 @@ function ConnectionBody({
   onToggleColumns,
   onToggleChildren,
   onLoadMore,
+  onRefreshDb,
 }: ConnectionBodyProps) {
   if (conn.status === "offline") {
     return (
@@ -905,21 +960,35 @@ function ConnectionBody({
         const dbOpen = filterActive || expandedDbs.has(dbKey);
         return (
           <div key={db.name}>
-            <button
-              type="button"
-              onClick={() => onToggleDb(conn.id, db.name)}
-              className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-            >
-              {dbOpen ? (
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              ) : (
-                <ChevronRight className="h-3 w-3 shrink-0" />
-              )}
-              <DbIcon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate" title={db.name}>
-                {highlight(db.name, query)}
-              </span>
-            </button>
+            <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
+              <button
+                type="button"
+                onClick={() => onToggleDb(conn.id, db.name)}
+                className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+              >
+                {dbOpen ? (
+                  <ChevronDown className="h-3 w-3 shrink-0" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 shrink-0" />
+                )}
+                <DbIcon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate" title={db.name}>
+                  {highlight(db.name, query)}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRefreshDb(conn.id, db.name);
+                }}
+                className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
+                aria-label={`Refresh ${db.name}`}
+                title={`Refresh ${db.name}`}
+              >
+                <RefreshCw className="h-3 w-3" />
+              </button>
+            </div>
             {dbOpen && (
               <DatabaseBody
                 connId={conn.id}
