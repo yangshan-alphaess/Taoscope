@@ -13,8 +13,17 @@ export function useCreateConsole() {
   const setActiveConsole = useAppState((s) => s.setActiveConsole);
 
   return useCallback(
-    async (connectionId: string): Promise<Console> => {
+    async (
+      connectionId: string,
+      opts?: { db?: string | null },
+    ): Promise<Console> => {
       const created = await ds.createConsole({ connectionId });
+      const targetDb = opts?.db ?? null;
+      if (targetDb !== null) {
+        // Persist the binding immediately so reloading / re-fetch sees it.
+        await ds.updateConsoleDb(created.id, targetDb);
+        created.currentDb = targetDb;
+      }
       addConsole(created);
       setActiveConsole(created.id);
       return created;

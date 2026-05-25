@@ -16,9 +16,11 @@ export function Toolbar() {
       <ToolbarButton
         onClick={run}
         disabled={!canRun}
-        title={fmtShortcut(["Mod", "Enter"])}
+        title={`Run statement at cursor — ${fmtShortcut(["Mod", "Enter"])}`}
         icon={<Play className="h-3.5 w-3.5" />}
-        label={isRunning ? "Running…" : "Run"}
+        label={
+          isRunning ? "Running…" : `Run ${fmtShortcut(["Mod", "Enter"])}`
+        }
         primary
       />
       <ToolbarButton

@@ -864,6 +864,9 @@ export function ResourcesPanel() {
                     onToggleChildren={toggleChildren}
                     onLoadMore={loadMoreChildren}
                     onRefreshDb={handleRefreshDatabase}
+                    onCreateConsoleInDb={(connId, db) =>
+                      void createConsole(connId, { db })
+                    }
                   />
                 )}
               </div>
@@ -904,6 +907,7 @@ interface ConnectionBodyProps {
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMore: (connId: string, db: string, stable: string) => void;
   onRefreshDb: (connId: string, db: string) => void;
+  onCreateConsoleInDb: (connId: string, db: string) => void;
 }
 
 function ConnectionBody({
@@ -923,6 +927,7 @@ function ConnectionBody({
   onToggleChildren,
   onLoadMore,
   onRefreshDb,
+  onCreateConsoleInDb,
 }: ConnectionBodyProps) {
   if (conn.status === "offline") {
     return (
@@ -960,35 +965,46 @@ function ConnectionBody({
         const dbOpen = filterActive || expandedDbs.has(dbKey);
         return (
           <div key={db.name}>
-            <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
-              <button
-                type="button"
-                onClick={() => onToggleDb(conn.id, db.name)}
-                className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
-              >
-                {dbOpen ? (
-                  <ChevronDown className="h-3 w-3 shrink-0" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 shrink-0" />
-                )}
-                <DbIcon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate" title={db.name}>
-                  {highlight(db.name, query)}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRefreshDb(conn.id, db.name);
-                }}
-                className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
-                aria-label={`Refresh ${db.name}`}
-                title={`Refresh ${db.name}`}
-              >
-                <RefreshCw className="h-3 w-3" />
-              </button>
-            </div>
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
+                  <button
+                    type="button"
+                    onClick={() => onToggleDb(conn.id, db.name)}
+                    className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+                  >
+                    {dbOpen ? (
+                      <ChevronDown className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 shrink-0" />
+                    )}
+                    <DbIcon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate" title={db.name}>
+                      {highlight(db.name, query)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRefreshDb(conn.id, db.name);
+                    }}
+                    className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
+                    aria-label={`Refresh ${db.name}`}
+                    title={`Refresh ${db.name}`}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </button>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onSelect={() => onCreateConsoleInDb(conn.id, db.name)}
+                >
+                  New Console bound to {db.name}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
             {dbOpen && (
               <DatabaseBody
                 connId={conn.id}
