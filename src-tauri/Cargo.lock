@@ -3015,6 +3015,8 @@ name = "taoscope"
 version = "0.1.0"
 dependencies = [
  "nanoid",
+ "rand",
+ "regex",
  "serde",
  "serde_json",
  "tauri",
