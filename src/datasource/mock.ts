@@ -1,8 +1,11 @@
 /**
- * MockDataSource: in-memory implementation of the DataSource contract.
+ * MockDataSource: browser-only fallback implementation of the DataSource
+ * contract. Used under `pnpm dev` when no Tauri runtime is present.
  *
- * Backing fixtures are declared statically below. runSql is "tier A" — it
- * ignores the input SQL and always returns the same demo time-series payload.
+ * Contains no seed connections and no schema fixtures: schema/query methods
+ * resolve to empty payloads. The class still preserves localStorage-backed
+ * persistence for whatever the user creates at runtime (connections, consoles,
+ * scratch, result, history) so the dev path can exercise the full UI.
  */
 
 import { nanoid } from "nanoid";
@@ -32,49 +35,20 @@ const HISTORY_KEY_PREFIX = "taoscope.history.";
 /** Yield to the microtask queue so callers always see real async behavior. */
 const tick = () => Promise.resolve();
 
-interface FixtureSchema {
-  databases: Database[];
-  /** Map of database name -> STables under it. */
-  stables: Record<string, STable[]>;
-  /** Map of database name -> non-child tables under it. */
-  tables: Record<string, Table[]>;
-}
+const EMPTY_QUERY_RESULT: QueryResult = {
+  columns: [],
+  rows: [],
+  rowCount: 0,
+  elapsedMs: 0,
+  truncated: false,
+};
 
-type SeedConnection = Omit<Connection, "id">;
-
-const SEED_CONNECTIONS: SeedConnection[] = [
-  {
-    name: "prod-shanghai",
-    host: "192.168.10.20",
-    port: 6041,
-    user: "root",
-    password: "",
-    status: "online",
-  },
-  {
-    name: "staging-bj",
-    host: "10.0.3.15",
-    port: 6041,
-    user: "dev",
-    password: "",
-    status: "online",
-  },
-  {
-    name: "dev-local",
-    host: "127.0.0.1",
-    port: 6041,
-    user: "root",
-    password: "",
-    status: "offline",
-  },
-];
-
-function loadConnectionsFromStorage(): Connection[] | null {
+function loadConnectionsFromStorage(): Connection[] {
   try {
     const raw = localStorage.getItem(CONNECTIONS_KEY);
-    if (!raw) return null;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
+    if (!Array.isArray(parsed)) return [];
     const valid = parsed.every(
       (c): c is Connection =>
         typeof c === "object" &&
@@ -83,9 +57,9 @@ function loadConnectionsFromStorage(): Connection[] | null {
         typeof c.name === "string" &&
         typeof c.host === "string",
     );
-    return valid ? (parsed as Connection[]) : null;
+    return valid ? (parsed as Connection[]) : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -97,132 +71,6 @@ function persistConnections(list: Connection[]): void {
   }
 }
 
-const METERS: STable = {
-  name: "meters",
-  columns: [
-    { name: "ts", type: "TIMESTAMP", isPrimaryTs: true },
-    { name: "current", type: "FLOAT" },
-    { name: "voltage", type: "INT" },
-    { name: "phase", type: "FLOAT" },
-  ],
-  tagColumns: [
-    { name: "location", type: "BINARY", length: 64, isTag: true },
-    { name: "groupId", type: "INT", isTag: true },
-  ],
-  childCount: 3847,
-};
-
-const DEVICES: STable = {
-  name: "devices",
-  columns: [
-    { name: "ts", type: "TIMESTAMP", isPrimaryTs: true },
-    { name: "online", type: "BOOL" },
-    { name: "uptime", type: "BIGINT" },
-  ],
-  tagColumns: [
-    { name: "model", type: "NCHAR", length: 32, isTag: true },
-    { name: "region", type: "BINARY", length: 32, isTag: true },
-  ],
-  childCount: 128,
-};
-
-const APP_LOGS: STable = {
-  name: "app_logs",
-  columns: [
-    { name: "ts", type: "TIMESTAMP", isPrimaryTs: true },
-    { name: "severity", type: "TINYINT" },
-    { name: "message", type: "NCHAR", length: 256 },
-  ],
-  tagColumns: [
-    { name: "app_name", type: "BINARY", length: 64, isTag: true },
-    { name: "host", type: "BINARY", length: 64, isTag: true },
-  ],
-  childCount: 12,
-};
-
-const ALERTS_TABLE: Table = {
-  name: "alerts",
-  isChild: false,
-};
-
-const ALERTS_COLUMNS: Column[] = [
-  { name: "ts", type: "TIMESTAMP", isPrimaryTs: true },
-  { name: "level", type: "INT" },
-  { name: "code", type: "BINARY", length: 32 },
-  { name: "msg", type: "NCHAR", length: 128 },
-  { name: "acked", type: "BOOL" },
-];
-
-const ONLINE_SCHEMA: FixtureSchema = {
-  databases: [
-    { name: "iot_db", retention: "14d", vgroups: 4, precision: "ms" },
-    { name: "log_db", retention: "7d", vgroups: 2, precision: "ms" },
-    { name: "system" },
-  ],
-  stables: {
-    iot_db: [METERS, DEVICES],
-    log_db: [APP_LOGS],
-    system: [],
-  },
-  tables: {
-    iot_db: [ALERTS_TABLE],
-    log_db: [],
-    system: [],
-  },
-};
-
-const STABLE_INDEX: Record<string, STable> = {
-  meters: METERS,
-  devices: DEVICES,
-  app_logs: APP_LOGS,
-};
-
-const TABLE_INDEX: Record<string, Column[]> = {
-  alerts: ALERTS_COLUMNS,
-};
-
-/** Pad an integer with leading zeros, e.g. childName(1) -> 'd_000001'. */
-function childName(index: number): string {
-  return `d_${String(index).padStart(6, "0")}`;
-}
-
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function randomFloat(min: number, max: number, digits = 2): number {
-  const raw = Math.random() * (max - min) + min;
-  return Number(raw.toFixed(digits));
-}
-
-const DEMO_LOCATIONS = ["shanghai", "beijing", "guangzhou", "shenzhen"];
-
-const DEMO_QUERY_COLUMNS: Column[] = [
-  { name: "ts", type: "TIMESTAMP", isPrimaryTs: true },
-  { name: "current", type: "FLOAT" },
-  { name: "voltage", type: "INT" },
-  { name: "phase", type: "FLOAT" },
-  { name: "location", type: "BINARY", length: 64, isTag: true },
-  { name: "groupId", type: "INT", isTag: true },
-];
-
-function buildDemoRows(n = 10): unknown[][] {
-  const count = Math.min(Math.max(n, 0), 1001);
-  const now = Date.now();
-  const rows: unknown[][] = [];
-  for (let i = 0; i < count; i++) {
-    rows.push([
-      now - (count - 1 - i) * 1000,
-      randomFloat(8.5, 14.5, 2),
-      randomInt(215, 232),
-      randomFloat(-0.5, 0.5, 3),
-      DEMO_LOCATIONS[i % DEMO_LOCATIONS.length],
-      randomInt(1, 5),
-    ]);
-  }
-  return rows;
-}
-
 function isLanHost(host: string): boolean {
   return (
     /^192\.168\./.test(host) ||
@@ -232,20 +80,15 @@ function isLanHost(host: string): boolean {
   );
 }
 
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export class MockDataSource implements DataSource {
   private _connections: Connection[];
 
   constructor() {
-    const stored = loadConnectionsFromStorage();
-    if (stored) {
-      this._connections = stored;
-    } else {
-      this._connections = SEED_CONNECTIONS.map((c) => ({
-        id: nanoid(),
-        ...c,
-      }));
-      persistConnections(this._connections);
-    }
+    this._connections = loadConnectionsFromStorage();
   }
 
   private persist(): void {
@@ -337,106 +180,41 @@ export class MockDataSource implements DataSource {
     return { ok: true };
   }
 
-  async listDatabases(connId: string): Promise<Database[]> {
+  async listDatabases(_connId: string): Promise<Database[]> {
     await tick();
-    const conn = this._connections.find((c) => c.id === connId);
-    if (!conn || conn.status === "offline") return [];
-    return ONLINE_SCHEMA.databases.map((d) => ({ ...d }));
+    return [];
   }
 
-  async listSTables(_connId: string, db: string): Promise<STable[]> {
+  async listSTables(_connId: string, _db: string): Promise<STable[]> {
     await tick();
-    const list = ONLINE_SCHEMA.stables[db];
-    return list ? list.map((s) => ({ ...s })) : [];
+    return [];
   }
 
   async listTables(
     _connId: string,
-    db: string,
+    _db: string,
     opts: ListTablesOpts,
   ): Promise<Paged<Table>> {
     await tick();
-    const { stable, page, pageSize, search } = opts;
-    const offset = (page - 1) * pageSize;
-
-    if (stable) {
-      const stb = ONLINE_SCHEMA.stables[db]?.find((s) => s.name === stable);
-      if (!stb) {
-        return { items: [], total: 0, page, pageSize };
-      }
-      // Generate child table names on demand; filter by `search` if provided.
-      if (search) {
-        const matches: Table[] = [];
-        for (let i = 1; i <= stb.childCount; i++) {
-          const name = childName(i);
-          if (name.includes(search)) matches.push({
-            name,
-            isChild: true,
-            stableName: stb.name,
-          });
-        }
-        const slice = matches.slice(offset, offset + pageSize);
-        return { items: slice, total: matches.length, page, pageSize };
-      }
-      const items: Table[] = [];
-      const start = offset + 1;
-      const end = Math.min(stb.childCount, offset + pageSize);
-      for (let i = start; i <= end; i++) {
-        items.push({ name: childName(i), isChild: true, stableName: stb.name });
-      }
-      return { items, total: stb.childCount, page, pageSize };
-    }
-
-    // No `stable` filter: return non-child tables in the database.
-    const all = ONLINE_SCHEMA.tables[db] ?? [];
-    const filtered = search
-      ? all.filter((t) => t.name.includes(search))
-      : all;
-    const slice = filtered.slice(offset, offset + pageSize);
-    return {
-      items: slice.map((t) => ({ ...t })),
-      total: filtered.length,
-      page,
-      pageSize,
-    };
+    return { items: [], total: 0, page: opts.page, pageSize: opts.pageSize };
   }
 
   async describeTable(
     _connId: string,
     _db: string,
-    table: string,
+    _table: string,
   ): Promise<Column[]> {
     await tick();
-    const stb = STABLE_INDEX[table];
-    if (stb) {
-      return [...stb.columns, ...stb.tagColumns];
-    }
-    const cols = TABLE_INDEX[table];
-    if (cols) return [...cols];
-    // Child table: look up its parent STable by prefix convention.
-    if (table.startsWith("d_")) {
-      // Without knowing the parent stable, default to meters' shape for the mock.
-      return [...METERS.columns, ...METERS.tagColumns];
-    }
     return [];
   }
 
   async runSql(
     _connId: string,
     _db: string | null,
-    sql: string,
+    _sql: string,
   ): Promise<QueryResult> {
     await tick();
-    const match = sql.match(/\bLIMIT\s+(\d+)/i);
-    const n = match ? Math.min(Number(match[1]), 1001) : 10;
-    const rows = buildDemoRows(n);
-    return {
-      columns: DEMO_QUERY_COLUMNS.map((c) => ({ ...c })),
-      rows,
-      rowCount: rows.length,
-      elapsedMs: randomInt(30, 80),
-      truncated: false,
-    };
+    return { ...EMPTY_QUERY_RESULT, columns: [], rows: [] };
   }
 
   async loadScratch(consoleId: string): Promise<string> {
@@ -486,7 +264,6 @@ export class MockDataSource implements DataSource {
     const target = list.find((c) => c.id === id);
     if (!target) throw new Error(`Console not found: ${id}`);
     if (target.name === name) {
-      // No-op rename is allowed.
       return;
     }
     const clash = list.find(

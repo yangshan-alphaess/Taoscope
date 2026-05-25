@@ -4,6 +4,11 @@
 // Tauri commands in commands.rs delegate to. All connections / consoles /
 // scratches / results / histories live in `<app_data_dir>/taoscope.db` and
 // survive process restarts.
+//
+// Connection passwords are stored directly in the `connections.password`
+// column as text. Empty password in update_connection means "keep current"
+// so the edit dialog can leave the password field blank without losing the
+// stored value.
 
 use std::path::Path;
 
@@ -15,7 +20,6 @@ use crate::datasource::types::{
     Connection as DsConnection, ConnectionInput, ConnectionStatus, Console as DsConsole,
     CreateConsoleInput, HistoryEntry, QueryResult,
 };
-use crate::datasource::vault;
 
 pub struct Store {
     conn: Connection,
@@ -33,7 +37,6 @@ impl Store {
             .map_err(db::map_err)?;
         db::migrate(&conn)?;
         db::seed_if_empty(&conn)?;
-        migrate_passwords_to_vault(&conn)?;
         Ok(Self { conn })
     }
 
@@ -43,38 +46,31 @@ impl Store {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT id, name, host, port, user, color, status \
+                "SELECT id, name, host, port, user, password, color, status \
                  FROM connections ORDER BY rowid",
             )
             .map_err(db::map_err)?;
         let rows = stmt
-            .query_map([], row_to_connection_no_password)
+            .query_map([], row_to_connection)
             .map_err(db::map_err)?;
         let mut out = Vec::new();
         for r in rows {
-            let mut c = r.map_err(db::map_err)?;
-            c.password = vault::get_password(&c.id)?;
-            out.push(c);
+            out.push(r.map_err(db::map_err)?);
         }
         Ok(out)
     }
 
     pub fn get_connection(&self, id: &str) -> Result<DsConnection, DataSourceError> {
-        let mut c = self
-            .conn
+        self.conn
             .query_row(
-                "SELECT id, name, host, port, user, color, status \
+                "SELECT id, name, host, port, user, password, color, status \
                  FROM connections WHERE id = ?1",
                 params![id],
-                row_to_connection_no_password,
+                row_to_connection,
             )
             .optional()
             .map_err(db::map_err)?
-            .ok_or_else(|| {
-                DataSourceError::NotFound(format!("Connection not found: {}", id))
-            })?;
-        c.password = vault::get_password(&c.id)?;
-        Ok(c)
+            .ok_or_else(|| DataSourceError::NotFound(format!("Connection not found: {}", id)))
     }
 
     pub fn create_connection(
@@ -84,17 +80,17 @@ impl Store {
         let name = input.name.trim().to_string();
         let id = nanoid::nanoid!();
 
-        // 1. INSERT placeholder row with empty password column.
         self.conn
             .execute(
                 "INSERT INTO connections (id, name, host, port, user, password, color, status) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, ?7)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 params![
                     id,
                     name,
                     input.host,
                     input.port,
                     input.user,
+                    input.password,
                     input.color,
                     status_str(&ConnectionStatus::Online),
                 ],
@@ -106,14 +102,6 @@ impl Store {
                 )),
                 other => other,
             })?;
-
-        // 2. Vault write; roll back the row if it fails.
-        if let Err(e) = vault::set_password(&id, &input.password) {
-            let _ = self
-                .conn
-                .execute("DELETE FROM connections WHERE id = ?1", params![id]);
-            return Err(e);
-        }
 
         Ok(DsConnection {
             id,
@@ -132,7 +120,7 @@ impl Store {
         id: &str,
         input: ConnectionInput,
     ) -> Result<(), DataSourceError> {
-        // Verify connection exists (without touching the vault).
+        // Verify connection exists first so we can return a clean NotFound.
         let exists: i64 = self
             .conn
             .query_row(
@@ -149,20 +137,33 @@ impl Store {
         }
 
         let name = input.name.trim().to_string();
-        // Keep the password column as the permanent "" placeholder.
-        self.conn
-            .execute(
+
+        // Empty password in update means "keep current" — the edit dialog
+        // doesn't display the actual password, so unless the user typed a
+        // new value we must not overwrite the stored one.
+        let affected = if input.password.is_empty() {
+            self.conn.execute(
                 "UPDATE connections SET name = ?1, host = ?2, port = ?3, user = ?4, \
                  color = ?5 WHERE id = ?6",
+                params![name, input.host, input.port, input.user, input.color, id],
+            )
+        } else {
+            self.conn.execute(
+                "UPDATE connections SET name = ?1, host = ?2, port = ?3, user = ?4, \
+                 password = ?5, color = ?6 WHERE id = ?7",
                 params![
                     name,
                     input.host,
                     input.port,
                     input.user,
+                    input.password,
                     input.color,
                     id,
                 ],
             )
+        };
+
+        affected
             .map_err(|e| match db::map_err(e) {
                 DataSourceError::AlreadyExists(_) => DataSourceError::AlreadyExists(format!(
                     "Connection name '{}' already exists",
@@ -171,15 +172,10 @@ impl Store {
                 other => other,
             })?;
 
-        // Vault write is independent of the db UPDATE; on failure the toast
-        // tells the user and they can retry.
-        vault::set_password(id, &input.password)
+        Ok(())
     }
 
     pub fn delete_connection(&mut self, id: &str) -> Result<(), DataSourceError> {
-        // Vault first; the missing-entry case is silent so this is safe even
-        // for connections that never had a password set.
-        vault::delete_password(id)?;
         self.conn
             .execute("DELETE FROM connections WHERE id = ?1", params![id])
             .map_err(db::map_err)?;
@@ -210,9 +206,7 @@ impl Store {
     pub fn next_console_name(&self, connection_id: &str) -> Result<String, DataSourceError> {
         let mut stmt = self
             .conn
-            .prepare(
-                "SELECT name FROM consoles WHERE connection_id = ?1",
-            )
+            .prepare("SELECT name FROM consoles WHERE connection_id = ?1")
             .map_err(db::map_err)?;
         let rows = stmt
             .query_map(params![connection_id], |r| r.get::<_, String>(0))
@@ -275,7 +269,6 @@ impl Store {
         id: &str,
         name: &str,
     ) -> Result<(), DataSourceError> {
-        // Find the console first.
         let current: Option<(String, String)> = self
             .conn
             .query_row(
@@ -460,10 +453,7 @@ impl Store {
 
 // ── Row mappers ─────────────────────────────────────────────────────────
 
-/// Build a Connection from a row that selects every column except `password`.
-/// Callers MUST fill `password` from `vault::get_password(&c.id)` before
-/// returning the connection to the rest of the app.
-fn row_to_connection_no_password(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> {
+fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> {
     let status_str: String = row.get("status")?;
     let status = match status_str.as_str() {
         "online" => ConnectionStatus::Online,
@@ -475,50 +465,10 @@ fn row_to_connection_no_password(row: &rusqlite::Row<'_>) -> rusqlite::Result<Ds
         host: row.get("host")?,
         port: row.get::<_, u16>("port")?,
         user: row.get("user")?,
-        password: String::new(),
+        password: row.get("password")?,
         color: row.get("color")?,
         status,
     })
-}
-
-/// One-time migration: move any plaintext password that survived from before
-/// `add-credential-vault` into the OS vault and blank the db column. Idempotent
-/// — after the first successful run every row's password column is "" so the
-/// SELECT returns nothing on subsequent boots.
-fn migrate_passwords_to_vault(
-    conn: &rusqlite::Connection,
-) -> Result<(), DataSourceError> {
-    let mut stmt = conn
-        .prepare("SELECT id, password FROM connections WHERE password != ''")
-        .map_err(db::map_err)?;
-    let rows: Vec<(String, String)> = stmt
-        .query_map([], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
-        })
-        .map_err(db::map_err)?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(db::map_err)?;
-    if rows.is_empty() {
-        return Ok(());
-    }
-
-    // Write every row to the vault first; if any one fails, leave the db
-    // untouched so the next startup retries cleanly.
-    for (id, password) in &rows {
-        vault::set_password(id, password)?;
-    }
-
-    // Once the vault is consistent, atomically blank the db columns.
-    let tx = conn.unchecked_transaction().map_err(db::map_err)?;
-    for (id, _) in &rows {
-        tx.execute(
-            "UPDATE connections SET password = '' WHERE id = ?1",
-            params![id],
-        )
-        .map_err(db::map_err)?;
-    }
-    tx.commit().map_err(db::map_err)?;
-    Ok(())
 }
 
 fn row_to_console(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConsole> {

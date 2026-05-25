@@ -7,8 +7,10 @@ import {
   Database as DbIcon,
   FileText,
   Layers,
+  MoreHorizontal,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
   X,
@@ -40,6 +42,13 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const CHILD_PAGE_SIZE = 50;
 
@@ -351,6 +360,32 @@ export function ResourcesPanel() {
       clearConnCache(c.id);
       toast.success("Connection deleted");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg);
+    }
+  }
+
+  async function handleRefreshConnection(c: Connection) {
+    if (c.status === "offline") {
+      toast.error(`${c.name} is offline`);
+      return;
+    }
+    // Drop cached schema for this connection, then re-fetch databases so the
+    // tree shows fresh data even if it's already expanded.
+    clearConnCache(c.id);
+    setExpandedConns((prev) => {
+      if (prev.has(c.id)) return prev;
+      const next = new Set(prev);
+      next.add(c.id);
+      return next;
+    });
+    setDbsByConn((prev) => ({ ...prev, [c.id]: "loading" }));
+    try {
+      const list = await ds.listDatabases(c.id);
+      setDbsByConn((prev) => ({ ...prev, [c.id]: list }));
+      toast.success(`Refreshed ${c.name}`);
+    } catch (err) {
+      setDbsByConn((prev) => ({ ...prev, [c.id]: [] }));
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(msg);
     }
@@ -694,34 +729,52 @@ export function ResourcesPanel() {
                           {highlight(c.name, query)}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDialogState({
-                            open: true,
-                            mode: "edit",
-                            conn: c,
-                          });
-                        }}
-                        className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-0.5 shrink-0 rounded-sm p-1 group-hover:visible"
-                        aria-label={`Edit ${c.name}`}
-                        title={`Edit ${c.name}`}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleDeleteConnection(c);
-                        }}
-                        className="text-muted-foreground/70 hover:text-destructive hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
-                        aria-label={`Delete ${c.name}`}
-                        title={`Delete ${c.name}`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible data-[state=open]:visible focus-visible:visible"
+                            aria-label={`Actions for ${c.name}`}
+                            title={`Actions for ${c.name}`}
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            disabled={isOffline}
+                            onSelect={() => {
+                              void handleRefreshConnection(c);
+                            }}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Refresh
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setDialogState({
+                                open: true,
+                                mode: "edit",
+                                conn: c,
+                              });
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              void handleDeleteConnection(c);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>

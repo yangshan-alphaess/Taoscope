@@ -1,11 +1,55 @@
-import { Settings, Maximize2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Minus, Square, X, Copy } from "lucide-react";
 import { useAppState } from "@/store/appState";
+import { isTauriRuntime } from "@/datasource/factory";
 import { cn } from "@/lib/utils";
+
+function detectMac(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Mac|iPhone|iPad/i.test(navigator.userAgent);
+}
+
+async function runOnWindow(
+  action: "minimize" | "toggleMaximize" | "close",
+): Promise<void> {
+  if (!isTauriRuntime()) return;
+  const mod = await import("@tauri-apps/api/window");
+  const win = mod.getCurrentWindow();
+  if (action === "minimize") await win.minimize();
+  else if (action === "toggleMaximize") await win.toggleMaximize();
+  else await win.close();
+}
 
 export function TitleBar() {
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const consoles = useAppState((s) => s.consoles);
   const connections = useAppState((s) => s.connections);
+  const [isMac] = useState(detectMac);
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  // macOS keeps native traffic lights (top-left, overlaid by Tauri's
+  // titleBarStyle: Overlay); only Windows / Linux show the custom trio.
+  const showControls = !isMac && isTauriRuntime();
+
+  useEffect(() => {
+    if (!showControls) return;
+    let cancelled = false;
+    let unlistenFn: (() => void) | undefined;
+    void (async () => {
+      const mod = await import("@tauri-apps/api/window");
+      const win = mod.getCurrentWindow();
+      const current = await win.isMaximized();
+      if (!cancelled) setIsMaximized(current);
+      unlistenFn = await win.onResized(async () => {
+        const next = await win.isMaximized();
+        if (!cancelled) setIsMaximized(next);
+      });
+    })();
+    return () => {
+      cancelled = true;
+      unlistenFn?.();
+    };
+  }, [showControls]);
 
   const activeConsole = activeConsoleId
     ? (consoles.find((c) => c.id === activeConsoleId) ?? null)
@@ -17,9 +61,11 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="bg-background border-border flex h-10 shrink-0 items-center border-b px-4 pl-20 select-none"
+      className={cn(
+        "bg-background border-border flex h-10 shrink-0 items-center border-b px-4 select-none",
+        isMac && "pl-20",
+      )}
     >
-      {/* pl-20 reserves space for macOS traffic lights on the left */}
       <div data-tauri-drag-region className="flex items-center gap-2">
         <div className="bg-primary h-3 w-3 rounded-sm" aria-hidden />
         <span className="text-sm font-medium">Taoscope</span>
@@ -46,22 +92,38 @@ export function TitleBar() {
         )}
       </div>
 
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          className="hover:bg-muted text-muted-foreground hover:text-foreground rounded-md p-1.5 transition-colors"
-          aria-label="Settings"
-        >
-          <Settings className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          className="hover:bg-muted text-muted-foreground hover:text-foreground rounded-md p-1.5 transition-colors"
-          aria-label="Maximize"
-        >
-          <Maximize2 className="h-4 w-4" />
-        </button>
-      </div>
+      {showControls && (
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => void runOnWindow("minimize")}
+            className="hover:bg-muted text-muted-foreground hover:text-foreground inline-flex h-8 w-10 items-center justify-center transition-colors"
+            aria-label="Minimize"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void runOnWindow("toggleMaximize")}
+            className="hover:bg-muted text-muted-foreground hover:text-foreground inline-flex h-8 w-10 items-center justify-center transition-colors"
+            aria-label={isMaximized ? "Restore" : "Maximize"}
+          >
+            {isMaximized ? (
+              <Copy className="h-3.5 w-3.5 -scale-x-100" />
+            ) : (
+              <Square className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runOnWindow("close")}
+            className="text-muted-foreground hover:bg-destructive hover:text-destructive-foreground inline-flex h-8 w-10 items-center justify-center transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

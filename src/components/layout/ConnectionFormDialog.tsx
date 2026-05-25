@@ -89,12 +89,16 @@ export function ConnectionFormDialog({
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && initial) {
+      // Password is intentionally left empty; the field's placeholder hints
+      // that empty means "keep current". The backend skips the vault write
+      // when password is empty in update, so editing other fields never
+      // accidentally wipes the stored credential.
       setForm({
         name: initial.name,
         host: initial.host,
         port: initial.port,
         user: initial.user,
-        password: initial.password,
+        password: "",
         color: initial.color,
       });
     } else {
@@ -118,7 +122,14 @@ export function ConnectionFormDialog({
     setBusy("test");
     setTestResult(null);
     try {
-      const result = await ds.testConnectionConfig(form);
+      // In edit mode the password field is empty by design — fall back to
+      // the existing connection's stored password for the test probe so the
+      // user can verify "did the other fields break it" without re-typing.
+      const effective: ConnectionInput =
+        mode === "edit" && initial && form.password === ""
+          ? { ...form, password: initial.password }
+          : form;
+      const result = await ds.testConnectionConfig(effective);
       setTestResult(result);
       if (result.ok) {
         toast.success("Connection OK");
@@ -198,6 +209,9 @@ export function ConnectionFormDialog({
               type="password"
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
+              placeholder={
+                mode === "edit" ? "Leave empty to keep current" : ""
+              }
             />
           </Field>
         </div>
@@ -242,11 +256,6 @@ export function ConnectionFormDialog({
             </Button>
           </div>
         </DialogFooter>
-
-        <p className="text-muted-foreground/70 mt-2 text-xs">
-          ⚠ Phase 1: password stored locally as plaintext; queries return
-          mock data regardless of host.
-        </p>
       </DialogContent>
     </Dialog>
   );
