@@ -207,8 +207,10 @@ pub async fn list_stables(
     conn: &Connection,
     db: &str,
 ) -> Result<Vec<STable>, DataSourceError> {
-    let show_sql = format!("SHOW STABLES FROM {}", ident(db));
-    let resp = execute_sql(conn, None, &show_sql).await?;
+    // TDengine 3.x does NOT accept `SHOW STABLES FROM <db>` (MySQL-style).
+    // Route the SQL through the REST path /rest/sql/<db> so `SHOW STABLES`
+    // resolves against the named db.
+    let resp = execute_sql(conn, Some(db), "SHOW STABLES").await?;
 
     let name_idx = column_index(&resp.column_meta, "stable_name")
         .or_else(|| column_index(&resp.column_meta, "name"));
@@ -328,9 +330,10 @@ pub async fn list_tables(
         });
     }
 
-    // No stable filter: SHOW TABLES + client-side slice.
-    let show_sql = format!("SHOW TABLES FROM {}", ident(db));
-    let resp = execute_sql(conn, None, &show_sql).await?;
+    // No stable filter: SHOW TABLES + client-side slice. TDengine 3.x does
+    // NOT accept `SHOW TABLES FROM <db>` (MySQL-style) — instead route via
+    // the REST path /rest/sql/<db> so SHOW TABLES resolves against the named db.
+    let resp = execute_sql(conn, Some(db), "SHOW TABLES").await?;
 
     let name_idx = column_index(&resp.column_meta, "table_name")
         .or_else(|| column_index(&resp.column_meta, "name"))
