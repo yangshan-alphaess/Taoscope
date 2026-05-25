@@ -2,6 +2,7 @@ import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { Play, Square, WandSparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmtShortcut } from "@/lib/platform";
+import { ConsoleDbPicker } from "./ConsoleDbPicker";
 import { QueryHistoryButton } from "./QueryHistoryButton";
 import { useFormatActiveConsole } from "./useFormatActiveConsole";
 import { useRunActiveConsole } from "./useRunActiveConsole";
@@ -35,6 +36,7 @@ export function Toolbar() {
         label="Cancel"
       />
       <div className="flex-1" />
+      <ConsoleDbPicker />
     </div>
   );
 }
