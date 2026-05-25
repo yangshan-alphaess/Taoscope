@@ -1,6 +1,7 @@
 import { forwardRef, useState, type ComponentPropsWithoutRef } from "react";
 import { Clock } from "lucide-react";
 
+import type { HistoryEntry } from "@/datasource/types";
 import { useDataSource } from "@/datasource/context";
 import {
   Popover,
@@ -9,6 +10,8 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/store/appState";
+
+const EMPTY_HISTORY: HistoryEntry[] = [];
 
 interface ToolbarTriggerProps extends ComponentPropsWithoutRef<"button"> {
   disabled?: boolean;
@@ -55,9 +58,10 @@ function relativeTime(epoch: number): string {
 export function QueryHistoryButton() {
   const ds = useDataSource();
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
-  const history = useAppState((s) =>
-    activeConsoleId ? (s.consoleRuntime[activeConsoleId]?.history ?? []) : [],
-  );
+  const history = useAppState((s) => {
+    if (!activeConsoleId) return EMPTY_HISTORY;
+    return s.consoleRuntime[activeConsoleId]?.history ?? EMPTY_HISTORY;
+  });
   const setScratch = useAppState((s) => s.setScratch);
   const setHistory = useAppState((s) => s.setHistory);
 
