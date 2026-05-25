@@ -15,6 +15,7 @@ use crate::datasource::types::{
     Connection as DsConnection, ConnectionInput, ConnectionStatus, Console as DsConsole,
     CreateConsoleInput, HistoryEntry, QueryResult,
 };
+use crate::datasource::vault;
 
 pub struct Store {
     conn: Connection,
@@ -32,6 +33,7 @@ impl Store {
             .map_err(db::map_err)?;
         db::migrate(&conn)?;
         db::seed_if_empty(&conn)?;
+        migrate_passwords_to_vault(&conn)?;
         Ok(Self { conn })
     }
 
@@ -41,33 +43,38 @@ impl Store {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT id, name, host, port, user, password, color, status \
+                "SELECT id, name, host, port, user, color, status \
                  FROM connections ORDER BY rowid",
             )
             .map_err(db::map_err)?;
         let rows = stmt
-            .query_map([], row_to_connection)
+            .query_map([], row_to_connection_no_password)
             .map_err(db::map_err)?;
         let mut out = Vec::new();
         for r in rows {
-            out.push(r.map_err(db::map_err)?);
+            let mut c = r.map_err(db::map_err)?;
+            c.password = vault::get_password(&c.id)?;
+            out.push(c);
         }
         Ok(out)
     }
 
     pub fn get_connection(&self, id: &str) -> Result<DsConnection, DataSourceError> {
-        self.conn
+        let mut c = self
+            .conn
             .query_row(
-                "SELECT id, name, host, port, user, password, color, status \
+                "SELECT id, name, host, port, user, color, status \
                  FROM connections WHERE id = ?1",
                 params![id],
-                row_to_connection,
+                row_to_connection_no_password,
             )
             .optional()
             .map_err(db::map_err)?
             .ok_or_else(|| {
                 DataSourceError::NotFound(format!("Connection not found: {}", id))
-            })
+            })?;
+        c.password = vault::get_password(&c.id)?;
+        Ok(c)
     }
 
     pub fn create_connection(
@@ -75,8 +82,41 @@ impl Store {
         input: ConnectionInput,
     ) -> Result<DsConnection, DataSourceError> {
         let name = input.name.trim().to_string();
-        let created = DsConnection {
-            id: nanoid::nanoid!(),
+        let id = nanoid::nanoid!();
+
+        // 1. INSERT placeholder row with empty password column.
+        self.conn
+            .execute(
+                "INSERT INTO connections (id, name, host, port, user, password, color, status) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, ?7)",
+                params![
+                    id,
+                    name,
+                    input.host,
+                    input.port,
+                    input.user,
+                    input.color,
+                    status_str(&ConnectionStatus::Online),
+                ],
+            )
+            .map_err(|e| match db::map_err(e) {
+                DataSourceError::AlreadyExists(_) => DataSourceError::AlreadyExists(format!(
+                    "Connection name '{}' already exists",
+                    name
+                )),
+                other => other,
+            })?;
+
+        // 2. Vault write; roll back the row if it fails.
+        if let Err(e) = vault::set_password(&id, &input.password) {
+            let _ = self
+                .conn
+                .execute("DELETE FROM connections WHERE id = ?1", params![id]);
+            return Err(e);
+        }
+
+        Ok(DsConnection {
+            id,
             name,
             host: input.host,
             port: input.port,
@@ -84,30 +124,7 @@ impl Store {
             password: input.password,
             color: input.color,
             status: ConnectionStatus::Online,
-        };
-        self.conn
-            .execute(
-                "INSERT INTO connections (id, name, host, port, user, password, color, status) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                params![
-                    created.id,
-                    created.name,
-                    created.host,
-                    created.port,
-                    created.user,
-                    created.password,
-                    created.color,
-                    status_str(&created.status),
-                ],
-            )
-            .map_err(|e| match db::map_err(e) {
-                DataSourceError::AlreadyExists(_) => DataSourceError::AlreadyExists(format!(
-                    "Connection name '{}' already exists",
-                    created.name
-                )),
-                other => other,
-            })?;
-        Ok(created)
+        })
     }
 
     pub fn update_connection(
@@ -115,20 +132,33 @@ impl Store {
         id: &str,
         input: ConnectionInput,
     ) -> Result<(), DataSourceError> {
-        // Verify connection exists.
-        let _existing = self.get_connection(id)?;
-        let name = input.name.trim().to_string();
-        let affected = self
+        // Verify connection exists (without touching the vault).
+        let exists: i64 = self
             .conn
+            .query_row(
+                "SELECT COUNT(*) FROM connections WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .map_err(db::map_err)?;
+        if exists == 0 {
+            return Err(DataSourceError::NotFound(format!(
+                "Connection not found: {}",
+                id
+            )));
+        }
+
+        let name = input.name.trim().to_string();
+        // Keep the password column as the permanent "" placeholder.
+        self.conn
             .execute(
                 "UPDATE connections SET name = ?1, host = ?2, port = ?3, user = ?4, \
-                 password = ?5, color = ?6 WHERE id = ?7",
+                 color = ?5 WHERE id = ?6",
                 params![
                     name,
                     input.host,
                     input.port,
                     input.user,
-                    input.password,
                     input.color,
                     id,
                 ],
@@ -140,16 +170,16 @@ impl Store {
                 )),
                 other => other,
             })?;
-        if affected == 0 {
-            return Err(DataSourceError::NotFound(format!(
-                "Connection not found: {}",
-                id
-            )));
-        }
-        Ok(())
+
+        // Vault write is independent of the db UPDATE; on failure the toast
+        // tells the user and they can retry.
+        vault::set_password(id, &input.password)
     }
 
     pub fn delete_connection(&mut self, id: &str) -> Result<(), DataSourceError> {
+        // Vault first; the missing-entry case is silent so this is safe even
+        // for connections that never had a password set.
+        vault::delete_password(id)?;
         self.conn
             .execute("DELETE FROM connections WHERE id = ?1", params![id])
             .map_err(db::map_err)?;
@@ -430,7 +460,10 @@ impl Store {
 
 // ── Row mappers ─────────────────────────────────────────────────────────
 
-fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> {
+/// Build a Connection from a row that selects every column except `password`.
+/// Callers MUST fill `password` from `vault::get_password(&c.id)` before
+/// returning the connection to the rest of the app.
+fn row_to_connection_no_password(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> {
     let status_str: String = row.get("status")?;
     let status = match status_str.as_str() {
         "online" => ConnectionStatus::Online,
@@ -442,10 +475,50 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> 
         host: row.get("host")?,
         port: row.get::<_, u16>("port")?,
         user: row.get("user")?,
-        password: row.get("password")?,
+        password: String::new(),
         color: row.get("color")?,
         status,
     })
+}
+
+/// One-time migration: move any plaintext password that survived from before
+/// `add-credential-vault` into the OS vault and blank the db column. Idempotent
+/// — after the first successful run every row's password column is "" so the
+/// SELECT returns nothing on subsequent boots.
+fn migrate_passwords_to_vault(
+    conn: &rusqlite::Connection,
+) -> Result<(), DataSourceError> {
+    let mut stmt = conn
+        .prepare("SELECT id, password FROM connections WHERE password != ''")
+        .map_err(db::map_err)?;
+    let rows: Vec<(String, String)> = stmt
+        .query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })
+        .map_err(db::map_err)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(db::map_err)?;
+    if rows.is_empty() {
+        return Ok(());
+    }
+
+    // Write every row to the vault first; if any one fails, leave the db
+    // untouched so the next startup retries cleanly.
+    for (id, password) in &rows {
+        vault::set_password(id, password)?;
+    }
+
+    // Once the vault is consistent, atomically blank the db columns.
+    let tx = conn.unchecked_transaction().map_err(db::map_err)?;
+    for (id, _) in &rows {
+        tx.execute(
+            "UPDATE connections SET password = '' WHERE id = ?1",
+            params![id],
+        )
+        .map_err(db::map_err)?;
+    }
+    tx.commit().map_err(db::map_err)?;
+    Ok(())
 }
 
 fn row_to_console(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConsole> {
