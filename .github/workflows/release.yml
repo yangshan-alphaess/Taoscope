@@ -50,16 +50,19 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          # Match the local toolchain (pnpm 11) — it understands the
-          # `allowBuilds` key our workspace file uses, and writes the
-          # lockfileVersion 9 already on disk. Pin a major instead of
-          # "latest" so future breaking changes don't silently break CI.
-          version: 11
+          # Match the local toolchain exactly. `version: 11` would resolve
+          # to "latest 11.x" — pnpm 11.3 silently raised its Node floor to
+          # 22.13 (it imports the Node 22.5+ builtin `node:sqlite`), which
+          # broke our Node 20 runners. Pin the patch to the version that
+          # produced the on-disk lockfile.
+          version: 11.2.2
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Node 22 LTS — current Active LTS, satisfies any future pnpm
+          # minor bump that pulls in newer node: builtins.
+          node-version: "22"
           cache: "pnpm"
 
       - name: Setup Rust
