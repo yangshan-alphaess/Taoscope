@@ -1,5 +1,6 @@
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { ListTree, Play, Square, WandSparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { fmtShortcut } from "@/lib/platform";
 import { ConsoleDbPicker } from "./ConsoleDbPicker";
@@ -9,43 +10,49 @@ import { useFormatActiveConsole } from "./useFormatActiveConsole";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 
 export function Toolbar() {
+  const { t } = useTranslation("console");
   const { canRun, isRunning, run, cancel } = useRunActiveConsole();
   const { explain } = useExplainActiveConsole();
   const { canFormat, format } = useFormatActiveConsole();
+
+  const runShortcut = fmtShortcut(["Mod", "Enter"]);
+  const explainShortcut = fmtShortcut(["Mod", "Shift", "Enter"]);
 
   return (
     <div className="border-border bg-background flex h-9 shrink-0 items-center gap-1 border-b px-2">
       <ToolbarButton
         onClick={run}
         disabled={!canRun}
-        title={`Run statement at cursor — ${fmtShortcut(["Mod", "Enter"])}`}
+        title={t("toolbar.run.title", { shortcut: runShortcut })}
         icon={<Play className="h-3.5 w-3.5" />}
         label={
-          isRunning ? "Running…" : `Run ${fmtShortcut(["Mod", "Enter"])}`
+          isRunning
+            ? t("toolbar.run.running")
+            : `${t("toolbar.run.label")} ${runShortcut}`
         }
         primary
       />
       <ToolbarButton
         onClick={explain}
         disabled={!canRun}
-        title={`Explain plan — ${fmtShortcut(["Mod", "Shift", "Enter"])}`}
+        title={t("toolbar.explain.title", { shortcut: explainShortcut })}
         icon={<ListTree className="h-3.5 w-3.5" />}
-        label="Explain"
+        label={t("toolbar.explain.label")}
       />
       <ToolbarButton
         onClick={format}
         disabled={!canFormat}
         title={fmtShortcut(["Mod", "Shift", "F"])}
         icon={<WandSparkles className="h-3.5 w-3.5" />}
-        label="Format"
+        label={t("toolbar.format.label")}
       />
       <QueryHistoryButton />
       <ToolbarButton
         onClick={cancel}
         disabled={!isRunning}
-        title="Cancel the in-flight query"
+        title={t("toolbar.cancel.title")}
         icon={<Square className="h-3.5 w-3.5" />}
-        label="Cancel"
+        label={t("toolbar.cancel.label")}
       />
       <div className="flex-1" />
       <ConsoleDbPicker />

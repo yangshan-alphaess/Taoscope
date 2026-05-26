@@ -1,1 +1,23 @@
-{}
+{
+  "phase": {
+    "checking": "检查中…",
+    "downloading": "下载中",
+    "downloading-percent": "下载中 {{pct}}%",
+    "installing": "安装中…",
+    "available": "v{{version}} · 安装",
+    "retry": "v{{version}} · 重试",
+    "version": "v{{version}}"
+  },
+  "tooltip": {
+    "idle": "点击检查更新",
+    "checking": "正在检查更新",
+    "available": "点击安装 v{{version}} 并重启",
+    "downloading": "正在下载更新",
+    "installing": "正在安装更新 — 即将重启",
+    "error-default": "检查更新失败"
+  },
+  "toast": {
+    "up-to-date": "v{{version}} 已是最新版本",
+    "check-failed": "检查更新失败：{{error}}"
+  }
+}

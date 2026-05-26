@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Database as DbIcon, Check, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
@@ -22,6 +23,7 @@ type LoadState =
   | { kind: "error"; message: string };
 
 export function ConsoleDbPicker() {
+  const { t } = useTranslation("console");
   const ds = useDataSource();
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const activeConsole = useAppState((s) =>
@@ -87,10 +89,10 @@ export function ConsoleDbPicker() {
           disabled={disabled}
           title={
             disabled
-              ? "Open a console first"
+              ? t("toolbar.db-picker.title-disabled")
               : currentDb
-                ? `Bound to database: ${currentDb}`
-                : "No database bound — click to pick"
+                ? t("toolbar.db-picker.title-bound", { db: currentDb })
+                : t("toolbar.db-picker.title-unbound")
           }
           className={cn(
             "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
@@ -103,13 +105,13 @@ export function ConsoleDbPicker() {
         >
           <DbIcon className="h-3.5 w-3.5" />
           <span className="font-mono">
-            {currentDb ?? "no database"}
+            {currentDb ?? t("toolbar.db-picker.no-database")}
           </span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Bind console to database</span>
+          <span>{t("toolbar.db-picker.label")}</span>
           <button
             type="button"
             onClick={(e) => {
@@ -117,7 +119,7 @@ export function ConsoleDbPicker() {
               void loadDatabases();
             }}
             className="text-muted-foreground hover:text-foreground rounded-sm p-1"
-            title="Refresh database list"
+            title={t("toolbar.db-picker.refresh-tooltip")}
           >
             <RefreshCw className="h-3 w-3" />
           </button>
@@ -126,7 +128,7 @@ export function ConsoleDbPicker() {
 
         {state.kind === "loading" && (
           <div className="text-muted-foreground px-2 py-2 text-xs">
-            Loading…
+            {t("toolbar.db-picker.loading")}
           </div>
         )}
         {state.kind === "error" && (
@@ -136,7 +138,7 @@ export function ConsoleDbPicker() {
         )}
         {state.kind === "ok" && state.items.length === 0 && (
           <div className="text-muted-foreground px-2 py-2 text-xs">
-            No databases.
+            {t("toolbar.db-picker.empty")}
           </div>
         )}
         {state.kind === "ok" &&
@@ -169,7 +171,7 @@ export function ConsoleDbPicker() {
               className="text-muted-foreground"
             >
               <X className="h-3.5 w-3.5" />
-              Clear binding
+              {t("toolbar.db-picker.clear")}
             </DropdownMenuItem>
           </>
         )}

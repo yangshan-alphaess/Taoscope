@@ -79,6 +79,7 @@ export function StatusBar() {
 }
 
 function UpdaterStatus() {
+  const { t } = useTranslation("updater");
   const {
     phase,
     availableVersion,
@@ -105,9 +106,9 @@ function UpdaterStatus() {
         void checkForUpdate().then(() => {
           const next = useUpdater.getState();
           if (next.phase === "uptodate") {
-            toast.success(`v${APP_VERSION} is up to date`);
+            toast.success(t("toast.up-to-date", { version: APP_VERSION }));
           } else if (next.phase === "error" && next.error) {
-            toast.error(`Update check failed: ${next.error}`);
+            toast.error(t("toast.check-failed", { error: next.error }));
           }
         });
     }
@@ -120,19 +121,19 @@ function UpdaterStatus() {
       label = (
         <>
           <Loader2 className="h-3 w-3 animate-spin" />
-          <span>checking…</span>
+          <span>{t("phase.checking")}</span>
         </>
       );
-      title = "Checking for updates";
+      title = t("tooltip.checking");
       break;
     case "available":
       label = (
         <>
           <Download className="h-3 w-3" />
-          <span>v{availableVersion} · install</span>
+          <span>{t("phase.available", { version: availableVersion })}</span>
         </>
       );
-      title = `Click to install v${availableVersion} and restart`;
+      title = t("tooltip.available", { version: availableVersion });
       break;
     case "downloading": {
       const pct =
@@ -142,35 +143,39 @@ function UpdaterStatus() {
       label = (
         <>
           <Loader2 className="h-3 w-3 animate-spin" />
-          <span>downloading{pct !== null ? ` ${pct}%` : "…"}</span>
+          <span>
+            {pct !== null
+              ? t("phase.downloading-percent", { pct })
+              : `${t("phase.downloading")}…`}
+          </span>
         </>
       );
-      title = "Downloading update";
+      title = t("tooltip.downloading");
       break;
     }
     case "installing":
       label = (
         <>
           <Loader2 className="h-3 w-3 animate-spin" />
-          <span>installing…</span>
+          <span>{t("phase.installing")}</span>
         </>
       );
-      title = "Installing update — will restart";
+      title = t("tooltip.installing");
       break;
     case "error":
       label = (
         <>
           <RefreshCw className="h-3 w-3" />
-          <span>v{APP_VERSION} · retry</span>
+          <span>{t("phase.retry", { version: APP_VERSION })}</span>
         </>
       );
-      title = error ?? "Update check failed";
+      title = error ?? t("tooltip.error-default");
       break;
     case "uptodate":
     case "idle":
     default:
-      label = <span>v{APP_VERSION}</span>;
-      title = "Click to check for updates";
+      label = <span>{t("phase.version", { version: APP_VERSION })}</span>;
+      title = t("tooltip.idle");
       break;
   }
 

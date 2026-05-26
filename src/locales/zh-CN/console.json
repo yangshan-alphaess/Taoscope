@@ -1,1 +1,73 @@
-{}
+{
+  "toolbar": {
+    "run": {
+      "label": "运行",
+      "running": "运行中…",
+      "title": "运行光标处语句 — {{shortcut}}"
+    },
+    "explain": {
+      "label": "执行计划",
+      "title": "查看执行计划 — {{shortcut}}"
+    },
+    "format": {
+      "label": "格式化"
+    },
+    "history": {
+      "label": "历史",
+      "title": "查询历史",
+      "popover-title": "查询历史（{{count}}）",
+      "empty": "暂无查询记录。",
+      "clear": "清空历史",
+      "row-meta-truncated": " · 已截断",
+      "rel": {
+        "just-now": "刚刚",
+        "seconds-ago": "{{n}} 秒前",
+        "minutes-ago": "{{n}} 分钟前",
+        "hours-ago": "{{n}} 小时前",
+        "days-ago": "{{n}} 天前"
+      }
+    },
+    "cancel": {
+      "label": "取消",
+      "title": "取消当前查询"
+    },
+    "db-picker": {
+      "no-database": "未选数据库",
+      "title-disabled": "请先打开一个控制台",
+      "title-bound": "已绑定数据库：{{db}}",
+      "title-unbound": "尚未绑定数据库 — 点击选择",
+      "label": "为控制台绑定数据库",
+      "refresh-tooltip": "刷新数据库列表",
+      "loading": "加载中…",
+      "empty": "暂无数据库。",
+      "clear": "清除绑定"
+    }
+  },
+  "consoles-panel": {
+    "title": "控制台",
+    "no-connections": "暂无连接。",
+    "no-consoles": "暂无控制台",
+    "rename-tooltip": "重命名控制台",
+    "delete-tooltip": "删除控制台",
+    "menu": {
+      "new": "新建控制台",
+      "offline-suffix": "（离线）",
+      "rename": "重命名",
+      "delete": "删除"
+    }
+  },
+  "editor": {
+    "placeholder": "-- 在此输入 SQL",
+    "empty-state": "打开或新建一个控制台以开始编写 SQL。"
+  },
+  "result-panel": {
+    "empty-no-console": "打开或新建一个控制台以开始。"
+  },
+  "delete-confirm": {
+    "title": "删除控制台 \"{{name}}\"？",
+    "description": "该控制台及其保存的 SQL 草稿将被永久删除。"
+  },
+  "format": {
+    "failed": "SQL 格式化失败：{{message}}"
+  }
+}

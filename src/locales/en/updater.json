@@ -1,1 +1,23 @@
-{}
+{
+  "phase": {
+    "checking": "checking…",
+    "downloading": "downloading",
+    "downloading-percent": "downloading {{pct}}%",
+    "installing": "installing…",
+    "available": "v{{version}} · install",
+    "retry": "v{{version}} · retry",
+    "version": "v{{version}}"
+  },
+  "tooltip": {
+    "idle": "Click to check for updates",
+    "checking": "Checking for updates",
+    "available": "Click to install v{{version}} and restart",
+    "downloading": "Downloading update",
+    "installing": "Installing update — will restart",
+    "error-default": "Update check failed"
+  },
+  "toast": {
+    "up-to-date": "v{{version}} is up to date",
+    "check-failed": "Update check failed: {{error}}"
+  }
+}

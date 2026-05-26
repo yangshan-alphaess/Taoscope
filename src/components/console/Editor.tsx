@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import CodeMirror from "@uiw/react-codemirror";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, placeholder } from "@codemirror/view";
 import { sql } from "@codemirror/lang-sql";
@@ -26,6 +27,8 @@ import { useEditorSchemaContext } from "./useEditorSchemaContext";
 const SCRATCH_DEBOUNCE_MS = 400;
 
 export function Editor() {
+  const { t, i18n } = useTranslation("console");
+  const { t: tCommon } = useTranslation("common");
   const ds = useDataSource();
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const runtime = useAppState((s) =>
@@ -131,7 +134,7 @@ export function Editor() {
       autocompletion(),
       highlightActiveLine(),
       lineNumbers(),
-      placeholder("-- write your SQL here"),
+      placeholder(t("editor.placeholder")),
       EditorView.contentAttributes.of({ spellcheck: "false" }),
       // Mod-Enter has to outrank the default Enter handler (which inserts a
       // newline) and the autocompletion Enter handler (which accepts a
@@ -167,13 +170,18 @@ export function Editor() {
       ]),
       ...taoscopeEditorExtensions,
     ];
-  }, [sqlSource]);
+    // i18n.language is included so a locale switch rebuilds the CodeMirror
+    // extension list, picking up the new placeholder string. The other deps
+    // are stable across locale changes; their inclusion is the existing
+    // behaviour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sqlSource, i18n.language]);
 
   if (!activeConsoleId) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center px-3">
         <p className="text-muted-foreground/60 text-xs">
-          Open or create a console to start writing SQL.
+          {t("editor.empty-state")}
         </p>
       </div>
     );
@@ -182,7 +190,9 @@ export function Editor() {
   if (!runtime) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center px-3">
-        <p className="text-muted-foreground/60 text-xs">Loading…</p>
+        <p className="text-muted-foreground/60 text-xs">
+          {tCommon("status.loading")}
+        </p>
       </div>
     );
   }

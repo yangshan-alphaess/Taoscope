@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/context-menu";
 
 export function ConsolesPanel() {
+  const { t } = useTranslation("console");
   const ds = useDataSource();
   const connections = useAppState((s) => s.connections);
   const consoles = useAppState((s) => s.consoles);
@@ -44,10 +46,9 @@ export function ConsolesPanel() {
   async function handleDelete(id: string) {
     const name = consoles.find((c) => c.id === id)?.name ?? id;
     const ok = await confirm({
-      title: `Delete console "${name}"?`,
-      description:
-        "The console and its saved SQL scratch will be permanently removed.",
-      confirmLabel: "Delete",
+      title: t("delete-confirm.title", { name }),
+      description: t("delete-confirm.description"),
+      confirmLabel: t("consoles-panel.menu.delete"),
       danger: true,
     });
     if (!ok) return;
@@ -59,12 +60,14 @@ export function ConsolesPanel() {
     <section className="bg-background flex h-full min-h-0 flex-col">
       <div className="border-border flex h-9 shrink-0 items-center border-b px-3">
         <h2 className="text-xs font-semibold tracking-wide uppercase">
-          Consoles
+          {t("consoles-panel.title")}
         </h2>
       </div>
       <div className="flex-1 overflow-y-auto py-1 text-xs">
         {connections.length === 0 ? (
-          <p className="text-muted-foreground p-3">No connections.</p>
+          <p className="text-muted-foreground p-3">
+            {t("consoles-panel.no-connections")}
+          </p>
         ) : (
           connections.map((conn) => {
             const isOpen = !collapsed.has(conn.id);
@@ -109,10 +112,10 @@ export function ConsolesPanel() {
                         void createConsole(conn.id);
                       }}
                     >
-                      New Console
+                      {t("consoles-panel.menu.new")}
                       {isOffline && (
                         <span className="text-muted-foreground ml-2 text-xs">
-                          (offline)
+                          {t("consoles-panel.menu.offline-suffix")}
                         </span>
                       )}
                     </ContextMenuItem>
@@ -123,7 +126,7 @@ export function ConsolesPanel() {
                   <div className="ml-3">
                     {group.length === 0 ? (
                       <p className="text-muted-foreground/60 px-3 py-1 italic">
-                        no consoles
+                        {t("consoles-panel.no-consoles")}
                       </p>
                     ) : (
                       group.map((c) => {
@@ -173,8 +176,8 @@ export function ConsolesPanel() {
                                     setRenamingId(c.id);
                                   }}
                                   className="hover:bg-muted ml-1 rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                                  aria-label="Rename console"
-                                  title="Rename console"
+                                  aria-label={t("consoles-panel.rename-tooltip")}
+                                  title={t("consoles-panel.rename-tooltip")}
                                 >
                                   <Pencil className="h-3 w-3" />
                                 </button>
@@ -185,8 +188,8 @@ export function ConsolesPanel() {
                                     void handleDelete(c.id);
                                   }}
                                   className="hover:bg-muted rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                                  aria-label="Delete console"
-                                  title="Delete console"
+                                  aria-label={t("consoles-panel.delete-tooltip")}
+                                  title={t("consoles-panel.delete-tooltip")}
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -196,7 +199,7 @@ export function ConsolesPanel() {
                               <ContextMenuItem
                                 onSelect={() => setRenamingId(c.id)}
                               >
-                                Rename
+                                {t("consoles-panel.menu.rename")}
                               </ContextMenuItem>
                               <ContextMenuItem
                                 onSelect={() => {
@@ -204,7 +207,7 @@ export function ConsolesPanel() {
                                 }}
                                 className="text-destructive focus:text-destructive"
                               >
-                                Delete
+                                {t("consoles-panel.menu.delete")}
                                 <span className="text-muted-foreground ml-auto pl-3 text-xs">
                                   {fmtShortcut(["Mod", "W"])}
                                 </span>

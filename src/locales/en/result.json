@@ -1,1 +1,59 @@
-{}
+{
+  "empty": {
+    "no-console": "Open or create a console to start.",
+    "loading": "Loading…",
+    "run-prompt": "Run a query to see results.",
+    "running": "Running query…",
+    "no-rows": "No rows.",
+    "no-rows-filtered": "No rows match the current filter."
+  },
+  "error": {
+    "timeout": "Query timed out after {{seconds}}s. Adjust the timeout in connection settings.",
+    "cancelled": "Query was cancelled.",
+    "failed-prefix": "Query failed:",
+    "unknown": "Unknown error"
+  },
+  "banner": {
+    "truncated": "Result was capped at {{cap}} rows. Add a {{limit}} clause to see specific data."
+  },
+  "filter": {
+    "title": "Filter rows",
+    "placeholder": "Filter…",
+    "clear-aria": "Clear filter",
+    "matching": "{{matched}} of {{total}} matching"
+  },
+  "export-bar": {
+    "row-count": "{{count}} {{rows}}",
+    "row-count-suffix": " · {{suffix}}",
+    "copy-csv": "Copy CSV",
+    "download-csv": "Download CSV",
+    "copy-json": "Copy JSON",
+    "download-json": "Download JSON",
+    "feedback-copied": "Copied!",
+    "feedback-downloaded": "Downloaded!",
+    "feedback-failed": "Failed",
+    "format-csv": "CSV",
+    "format-json": "JSON",
+    "row-count-meta": "{{n}} rows · {{detail}}",
+    "row-count-meta-all": "all rows",
+    "row-count-meta-capped": "capped at {{cap}}"
+  },
+  "context-menu": {
+    "sort-asc": "Sort ascending",
+    "sort-desc": "Sort descending",
+    "clear-sort": "Clear sort",
+    "copy-column-name": "Copy column name",
+    "copy-column-values": "Copy column values",
+    "copy-value": "Copy value",
+    "copy-row-tsv": "Copy row as TSV",
+    "copy-row-json": "Copy row as JSON"
+  },
+  "toast": {
+    "copied-quoted": "Copied \"{{value}}\"",
+    "copied-empty": "Copied (empty)",
+    "copied-row": "Copied row",
+    "copied-row-json": "Copied row as JSON",
+    "copied-values": "Copied {{n}} values",
+    "failed-to-copy": "Failed to copy"
+  }
+}

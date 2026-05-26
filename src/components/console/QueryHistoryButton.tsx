@@ -1,5 +1,7 @@
 import { forwardRef, useState, type ComponentPropsWithoutRef } from "react";
 import { Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import type { HistoryEntry } from "@/datasource/types";
 import { useDataSource } from "@/datasource/context";
@@ -15,16 +17,21 @@ const EMPTY_HISTORY: HistoryEntry[] = [];
 
 interface ToolbarTriggerProps extends ComponentPropsWithoutRef<"button"> {
   disabled?: boolean;
+  label: string;
+  title: string;
 }
 
 const HistoryTrigger = forwardRef<HTMLButtonElement, ToolbarTriggerProps>(
-  function HistoryTrigger({ disabled, className, ...rest }, ref) {
+  function HistoryTrigger(
+    { disabled, className, label, title, ...rest },
+    ref,
+  ) {
     return (
       <button
         ref={ref}
         type="button"
         disabled={disabled}
-        title="Query history"
+        title={title}
         className={cn(
           "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
           disabled
@@ -35,27 +42,29 @@ const HistoryTrigger = forwardRef<HTMLButtonElement, ToolbarTriggerProps>(
         {...rest}
       >
         <Clock className="h-3.5 w-3.5" />
-        <span>History</span>
+        <span>{label}</span>
       </button>
     );
   },
 );
 
-function relativeTime(epoch: number): string {
+function relativeTime(epoch: number, t: TFunction): string {
   const diffMs = Date.now() - epoch;
-  if (diffMs < 0) return "just now";
+  if (diffMs < 0) return t("history.rel.just-now");
   const sec = Math.floor(diffMs / 1000);
-  if (sec < 30) return "just now";
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 30) return t("history.rel.just-now");
+  if (sec < 60) return t("history.rel.seconds-ago", { n: sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("history.rel.minutes-ago", { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("history.rel.hours-ago", { n: hr });
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return t("history.rel.days-ago", { n: day });
 }
 
 export function QueryHistoryButton() {
+  const { t } = useTranslation("console");
+  const { t: tCommon } = useTranslation("common");
   const ds = useDataSource();
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const history = useAppState((s) => {
@@ -82,7 +91,11 @@ export function QueryHistoryButton() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <HistoryTrigger disabled={!activeConsoleId} />
+        <HistoryTrigger
+          disabled={!activeConsoleId}
+          label={t("toolbar.history.label")}
+          title={t("toolbar.history.title")}
+        />
       </PopoverTrigger>
       <PopoverContent
         align="start"
@@ -90,11 +103,11 @@ export function QueryHistoryButton() {
         className="w-96 p-0"
       >
         <div className="border-border border-b px-3 py-1.5 text-xs font-medium">
-          Query history ({history.length})
+          {t("history.popover-title", { count: history.length })}
         </div>
         {history.length === 0 ? (
           <p className="text-muted-foreground/70 px-3 py-3 text-xs italic">
-            No queries run yet.
+            {t("history.empty")}
           </p>
         ) : (
           <ul className="max-h-80 overflow-y-auto">
@@ -114,9 +127,10 @@ export function QueryHistoryButton() {
                       {preview}
                     </span>
                     <span className="text-muted-foreground/80 text-[10px]">
-                      {relativeTime(entry.runAt)} · {entry.rowCount} rows ·{" "}
-                      {entry.elapsedMs}ms
-                      {entry.truncated && " · capped"}
+                      {relativeTime(entry.runAt, t)} · {entry.rowCount}{" "}
+                      {tCommon("unit.rows")} · {entry.elapsedMs}
+                      {tCommon("unit.ms")}
+                      {entry.truncated && t("history.row-meta-truncated")}
                     </span>
                   </button>
                 </li>
@@ -130,7 +144,7 @@ export function QueryHistoryButton() {
             onClick={clearAll}
             className="text-destructive hover:bg-muted/40 border-border w-full border-t px-3 py-1.5 text-left text-xs"
           >
-            Clear history
+            {t("history.clear")}
           </button>
         )}
       </PopoverContent>

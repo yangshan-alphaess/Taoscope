@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Copy, Download, Search, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { QueryResult } from "@/datasource/types";
 import { cn } from "@/lib/utils";
@@ -12,20 +13,6 @@ import {
 
 type Feedback = "idle" | "success" | "fail";
 type ButtonKey = "copyCsv" | "downloadCsv" | "copyJson" | "downloadJson";
-
-const SUCCESS_LABEL: Record<ButtonKey, string> = {
-  copyCsv: "Copied!",
-  downloadCsv: "Downloaded!",
-  copyJson: "Copied!",
-  downloadJson: "Downloaded!",
-};
-
-const FORMAT_LABEL: Record<ButtonKey, string> = {
-  copyCsv: "CSV",
-  downloadCsv: "CSV",
-  copyJson: "JSON",
-  downloadJson: "JSON",
-};
 
 function downloadBlob(text: string, mime: string, filename: string): void {
   const blob = new Blob([text], { type: mime });
@@ -48,6 +35,7 @@ export function ResultExportBar({
   filterQuery: string;
   onFilterChange: (q: string) => void;
 }) {
+  const { t } = useTranslation("result");
   const [feedback, setFeedback] = useState<Record<ButtonKey, Feedback>>({
     copyCsv: "idle",
     downloadCsv: "idle",
@@ -75,6 +63,20 @@ export function ResultExportBar({
   }, [filterQuery, result]);
 
   if (result.rows.length === 0) return null;
+
+  const SUCCESS_LABEL: Record<ButtonKey, string> = {
+    copyCsv: t("export-bar.feedback-copied"),
+    downloadCsv: t("export-bar.feedback-downloaded"),
+    copyJson: t("export-bar.feedback-copied"),
+    downloadJson: t("export-bar.feedback-downloaded"),
+  };
+
+  const FORMAT_LABEL: Record<ButtonKey, string> = {
+    copyCsv: t("export-bar.format-csv"),
+    downloadCsv: t("export-bar.format-csv"),
+    copyJson: t("export-bar.format-json"),
+    downloadJson: t("export-bar.format-json"),
+  };
 
   function flash(key: ButtonKey, status: Feedback) {
     setFeedback((prev) => ({ ...prev, [key]: status }));
@@ -109,7 +111,7 @@ export function ResultExportBar({
   function labelFor(key: ButtonKey): string {
     const state = feedback[key];
     if (state === "success") return SUCCESS_LABEL[key];
-    if (state === "fail") return "Failed";
+    if (state === "fail") return t("export-bar.feedback-failed");
     return FORMAT_LABEL[key];
   }
 
@@ -148,6 +150,15 @@ export function ResultExportBar({
   }
 
   const showInput = filterExpanded || !!filterQuery;
+
+  const rightMeta = filterQuery
+    ? t("filter.matching", { matched: matchCount, total: result.rowCount })
+    : t("export-bar.row-count-meta", {
+        n: result.rowCount,
+        detail: result.truncated
+          ? t("export-bar.row-count-meta-capped", { cap: 1000 })
+          : t("export-bar.row-count-meta-all"),
+      });
 
   return (
     <div className="border-border bg-card/40 flex shrink-0 items-center gap-1 border-b px-2 py-1">
@@ -188,7 +199,7 @@ export function ResultExportBar({
       <button
         type="button"
         onClick={toggleFilter}
-        title="Filter rows"
+        title={t("filter.title")}
         className={cn(
           "text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center gap-1 rounded-sm px-2 py-1 text-xs",
           showInput && "text-foreground bg-muted/50",
@@ -209,7 +220,7 @@ export function ResultExportBar({
                 setFilterExpanded(false);
               }
             }}
-            placeholder="Filter…"
+            placeholder={t("filter.placeholder")}
             className="bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none border-border h-6 w-48 rounded-sm border px-1.5 text-xs"
           />
           {filterQuery && (
@@ -217,7 +228,7 @@ export function ResultExportBar({
               type="button"
               onClick={() => onFilterChange("")}
               className="text-muted-foreground hover:text-foreground rounded-sm p-0.5"
-              aria-label="Clear filter"
+              aria-label={t("filter.clear-aria")}
             >
               <X className="h-3 w-3" />
             </button>
@@ -225,9 +236,7 @@ export function ResultExportBar({
         </div>
       )}
       <span className="text-muted-foreground/60 ml-auto text-xs">
-        {filterQuery
-          ? `${matchCount} of ${result.rowCount} matching`
-          : `${result.rowCount} rows · ${result.truncated ? "capped at 1000" : "all rows"}`}
+        {rightMeta}
       </span>
     </div>
   );

@@ -15,6 +15,7 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, X } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import type { Column, QueryResult } from "@/datasource/types";
 import { cn } from "@/lib/utils";
@@ -130,6 +131,7 @@ export function ResultGrid({
   result: QueryResult;
   filterQuery?: string;
 }) {
+  const { t } = useTranslation("result");
   const activeId = useAppState((s) => s.activeConsoleId);
   const gridState =
     useAppState((s) =>
@@ -224,8 +226,12 @@ export function ResultGrid({
                   if (!col) return;
                   navigator.clipboard
                     .writeText(col.name)
-                    .then(() => toast.success(`Copied "${col.name}"`))
-                    .catch(() => toast.error("Failed to copy"));
+                    .then(() =>
+                      toast.success(
+                        t("toast.copied-quoted", { value: col.name }),
+                      ),
+                    )
+                    .catch(() => toast.error(t("toast.failed-to-copy")));
                 }
 
                 function copyColumnValues() {
@@ -234,9 +240,11 @@ export function ResultGrid({
                   navigator.clipboard
                     .writeText(text)
                     .then(() =>
-                      toast.success(`Copied ${result.rows.length} values`),
+                      toast.success(
+                        t("toast.copied-values", { n: result.rows.length }),
+                      ),
                     )
-                    .catch(() => toast.error("Failed to copy"));
+                    .catch(() => toast.error(t("toast.failed-to-copy")));
                 }
 
                 return (
@@ -283,20 +291,20 @@ export function ResultGrid({
                         onSelect={() => header.column.toggleSorting(false)}
                       >
                         <ArrowUp className="mr-2 h-3 w-3" />
-                        Sort ascending
+                        {t("context-menu.sort-asc")}
                       </ContextMenuItem>
                       <ContextMenuItem
                         onSelect={() => header.column.toggleSorting(true)}
                       >
                         <ArrowDown className="mr-2 h-3 w-3" />
-                        Sort descending
+                        {t("context-menu.sort-desc")}
                       </ContextMenuItem>
                       {sortDir !== false && (
                         <ContextMenuItem
                           onSelect={() => header.column.clearSorting()}
                         >
                           <X className="mr-2 h-3 w-3" />
-                          Clear sort
+                          {t("context-menu.clear-sort")}
                         </ContextMenuItem>
                       )}
                       <ContextMenuSeparator />
@@ -304,13 +312,13 @@ export function ResultGrid({
                         onSelect={copyColumnName}
                         disabled={!col}
                       >
-                        Copy column name
+                        {t("context-menu.copy-column-name")}
                       </ContextMenuItem>
                       <ContextMenuItem
                         onSelect={copyColumnValues}
                         disabled={!col}
                       >
-                        Copy column values
+                        {t("context-menu.copy-column-values")}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
@@ -335,8 +343,8 @@ export function ResultGrid({
                 style={{ width: totalWidth }}
               >
                 {result.rows.length === 0
-                  ? "No rows."
-                  : "No rows match the current filter."}
+                  ? t("empty.no-rows")
+                  : t("empty.no-rows-filtered")}
               </td>
             </tr>
           )}

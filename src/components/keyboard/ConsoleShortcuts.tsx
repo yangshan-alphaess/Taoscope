@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import * as editorBridge from "@/components/console/editorBridge";
 import { formatScratch } from "@/components/console/formatScratch";
@@ -24,9 +25,11 @@ interface ShortcutState {
   removeConsole: (id: string) => void;
   setScratch: (id: string, scratch: string) => void;
   explain: () => void;
+  t: (key: string, vars?: Record<string, unknown>) => string;
 }
 
 export function ConsoleShortcuts() {
+  const { t } = useTranslation("console");
   const ds = useDataSource();
   const consoles = useAppState((s) => s.consoles);
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
@@ -49,6 +52,7 @@ export function ConsoleShortcuts() {
     removeConsole,
     setScratch,
     explain,
+    t: t as ShortcutState["t"],
   });
 
   useEffect(() => {
@@ -63,6 +67,7 @@ export function ConsoleShortcuts() {
       removeConsole,
       setScratch,
       explain,
+      t: t as ShortcutState["t"],
     };
   });
 
@@ -95,7 +100,7 @@ export function ConsoleShortcuts() {
           if (result.ok) {
             editorBridge.replaceRange(sel.from, sel.to, result.formatted);
           } else {
-            toast.error(`Failed to format SQL: ${result.message}`);
+            toast.error(s.t("format.failed", { message: result.message }));
           }
           return;
         }
@@ -104,7 +109,7 @@ export function ConsoleShortcuts() {
         if (result.ok) {
           setScratch(activeConsoleId, result.formatted);
         } else {
-          toast.error(`Failed to format SQL: ${result.message}`);
+          toast.error(s.t("format.failed", { message: result.message }));
         }
         return;
       }
@@ -156,10 +161,9 @@ export function ConsoleShortcuts() {
         if (!active) return;
         void (async () => {
           const ok = await confirm({
-            title: `Delete console "${active.name}"?`,
-            description:
-              "The console and its saved SQL scratch will be permanently removed.",
-            confirmLabel: "Delete",
+            title: s.t("delete-confirm.title", { name: active.name }),
+            description: s.t("delete-confirm.description"),
+            confirmLabel: s.t("consoles-panel.menu.delete"),
             danger: true,
           });
           if (!ok) return;

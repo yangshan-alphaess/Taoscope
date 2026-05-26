@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useAppState } from "@/store/appState";
 import * as editorBridge from "./editorBridge";
 import { formatScratch } from "./formatScratch";
@@ -9,6 +10,7 @@ export interface UseFormatActiveConsoleResult {
 }
 
 export function useFormatActiveConsole(): UseFormatActiveConsoleResult {
+  const { t } = useTranslation("console");
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const runtime = useAppState((s) =>
     activeConsoleId ? s.consoleRuntime[activeConsoleId] : undefined,
@@ -28,7 +30,7 @@ export function useFormatActiveConsole(): UseFormatActiveConsoleResult {
       if (result.ok) {
         editorBridge.replaceRange(sel.from, sel.to, result.formatted);
       } else {
-        toast.error(`Failed to format SQL: ${result.message}`);
+        toast.error(t("format.failed", { message: result.message }));
       }
       return;
     }
@@ -37,7 +39,7 @@ export function useFormatActiveConsole(): UseFormatActiveConsoleResult {
     if (result.ok) {
       setScratch(activeConsoleId, result.formatted);
     } else {
-      toast.error(`Failed to format SQL: ${result.message}`);
+      toast.error(t("format.failed", { message: result.message }));
     }
   }
 

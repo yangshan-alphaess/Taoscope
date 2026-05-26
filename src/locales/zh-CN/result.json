@@ -1,1 +1,59 @@
-{}
+{
+  "empty": {
+    "no-console": "打开或新建一个控制台以开始。",
+    "loading": "加载中…",
+    "run-prompt": "运行查询以查看结果。",
+    "running": "正在执行查询…",
+    "no-rows": "无数据行。",
+    "no-rows-filtered": "无数据行匹配当前过滤条件。"
+  },
+  "error": {
+    "timeout": "查询超时（{{seconds}} 秒）。请在连接设置中调整超时。",
+    "cancelled": "查询已取消。",
+    "failed-prefix": "查询失败：",
+    "unknown": "未知错误"
+  },
+  "banner": {
+    "truncated": "结果已截断至 {{cap}} 行。添加 {{limit}} 子句以查看具体数据。"
+  },
+  "filter": {
+    "title": "过滤行",
+    "placeholder": "过滤…",
+    "clear-aria": "清除过滤",
+    "matching": "{{matched}} / {{total}} 行匹配"
+  },
+  "export-bar": {
+    "row-count": "{{count}} {{rows}}",
+    "row-count-suffix": " · {{suffix}}",
+    "copy-csv": "复制 CSV",
+    "download-csv": "下载 CSV",
+    "copy-json": "复制 JSON",
+    "download-json": "下载 JSON",
+    "feedback-copied": "已复制！",
+    "feedback-downloaded": "已下载！",
+    "feedback-failed": "失败",
+    "format-csv": "CSV",
+    "format-json": "JSON",
+    "row-count-meta": "{{n}} 行 · {{detail}}",
+    "row-count-meta-all": "全部行",
+    "row-count-meta-capped": "截断至 {{cap}}"
+  },
+  "context-menu": {
+    "sort-asc": "升序排序",
+    "sort-desc": "降序排序",
+    "clear-sort": "清除排序",
+    "copy-column-name": "复制列名",
+    "copy-column-values": "复制列值",
+    "copy-value": "复制值",
+    "copy-row-tsv": "复制行（TSV）",
+    "copy-row-json": "复制行（JSON）"
+  },
+  "toast": {
+    "copied-quoted": "已复制 \"{{value}}\"",
+    "copied-empty": "已复制（空）",
+    "copied-row": "已复制行",
+    "copied-row-json": "已复制行（JSON）",
+    "copied-values": "已复制 {{n}} 个值",
+    "failed-to-copy": "复制失败"
+  }
+}

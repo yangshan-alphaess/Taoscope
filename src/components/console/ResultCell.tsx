@@ -1,6 +1,7 @@
 import type { Cell } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import type { Column } from "@/datasource/types";
 import { cn } from "@/lib/utils";
@@ -28,16 +29,9 @@ interface ResultCellProps {
 }
 
 function previewValue(s: string): string {
-  if (s === "") return "(empty)";
+  if (s === "") return "";
   if (s.length > 30) return `${s.slice(0, 30)}…`;
   return s;
-}
-
-function copyWithToast(text: string, successLabel: string): void {
-  navigator.clipboard
-    .writeText(text)
-    .then(() => toast.success(successLabel))
-    .catch(() => toast.error("Failed to copy"));
 }
 
 export function ResultCell({
@@ -47,26 +41,37 @@ export function ResultCell({
   columns,
   numeric,
 }: ResultCellProps) {
+  const { t } = useTranslation("result");
   const value = cell.getValue();
+
+  function copyWithToast(text: string, successLabel: string): void {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success(successLabel))
+      .catch(() => toast.error(t("toast.failed-to-copy")));
+  }
 
   function handleCopyValue() {
     const text = col ? serializeValue(value, col) : String(value ?? "");
     const preview = previewValue(text);
-    const label = preview === "(empty)" ? "Copied (empty)" : `Copied "${preview}"`;
+    const label =
+      preview === ""
+        ? t("toast.copied-empty")
+        : t("toast.copied-quoted", { value: preview });
     copyWithToast(text, label);
   }
 
   function handleCopyTsv() {
-    copyWithToast(rowToTsv(row, columns), "Copied row");
+    copyWithToast(rowToTsv(row, columns), t("toast.copied-row"));
   }
 
   function handleCopyJson() {
-    copyWithToast(rowToJson(row, columns), "Copied row as JSON");
+    copyWithToast(rowToJson(row, columns), t("toast.copied-row-json"));
   }
 
   function handleCopyColumnName() {
     if (!col) return;
-    copyWithToast(col.name, `Copied "${col.name}"`);
+    copyWithToast(col.name, t("toast.copied-quoted", { value: col.name }));
   }
 
   return (
@@ -89,17 +94,17 @@ export function ResultCell({
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem onSelect={handleCopyValue}>
-          Copy value
+          {t("context-menu.copy-value")}
         </ContextMenuItem>
         <ContextMenuItem onSelect={handleCopyTsv}>
-          Copy row as TSV
+          {t("context-menu.copy-row-tsv")}
         </ContextMenuItem>
         <ContextMenuItem onSelect={handleCopyJson}>
-          Copy row as JSON
+          {t("context-menu.copy-row-json")}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={handleCopyColumnName} disabled={!col}>
-          Copy column name
+          {t("context-menu.copy-column-name")}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { QueryResult } from "@/datasource/types";
 import { useAppState } from "@/store/appState";
@@ -24,14 +25,14 @@ function parseTimeoutSeconds(message: string): number | null {
 }
 
 function FullScreenError({ message }: { message: string }) {
+  const { t } = useTranslation("result");
   const timeoutSec = parseTimeoutSeconds(message);
   if (timeoutSec !== null) {
     return (
       <div className="flex h-full items-center justify-center px-4">
         <p className="text-amber-700 dark:text-amber-300 text-xs">
           <span className="mr-1">⏱</span>
-          Query timed out after {timeoutSec}s. Adjust the timeout in
-          connection settings.
+          {t("error.timeout", { seconds: timeoutSec })}
         </p>
       </div>
     );
@@ -39,7 +40,7 @@ function FullScreenError({ message }: { message: string }) {
   if (message.startsWith("Query cancelled")) {
     return (
       <div className="flex h-full items-center justify-center px-4">
-        <p className="text-muted-foreground text-xs">Query was cancelled.</p>
+        <p className="text-muted-foreground text-xs">{t("error.cancelled")}</p>
       </div>
     );
   }
@@ -47,13 +48,15 @@ function FullScreenError({ message }: { message: string }) {
     <div className="flex h-full items-center justify-center px-4">
       <p className="text-destructive text-xs">
         <span className="mr-1">✕</span>
-        Query failed: <span className="font-mono">{message}</span>
+        {t("error.failed-prefix")}{" "}
+        <span className="font-mono">{message}</span>
       </p>
     </div>
   );
 }
 
 function GridWithBanners({ result }: { result: QueryResult }) {
+  const { t } = useTranslation("result");
   const [filterQuery, setFilterQuery] = useState("");
   useEffect(() => {
     setFilterQuery("");
@@ -70,9 +73,7 @@ function GridWithBanners({ result }: { result: QueryResult }) {
         <div className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 flex shrink-0 items-center gap-1.5 border-b px-3 py-1 text-xs">
           <span>⚠</span>
           <span>
-            Result was capped at 1000 rows. Add a{" "}
-            <code className="font-mono">LIMIT</code> clause to see specific
-            data.
+            {t("banner.truncated", { cap: 1000, limit: "LIMIT" })}
           </span>
         </div>
       )}
@@ -84,6 +85,7 @@ function GridWithBanners({ result }: { result: QueryResult }) {
 }
 
 export function ResultPanel() {
+  const { t } = useTranslation("result");
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const runtime = useAppState((s) =>
     activeConsoleId ? s.consoleRuntime[activeConsoleId] : undefined,
@@ -91,16 +93,16 @@ export function ResultPanel() {
 
   let body: ReactNode;
   if (!activeConsoleId) {
-    body = <EmptyHint>Open or create a console to start.</EmptyHint>;
+    body = <EmptyHint>{t("empty.no-console")}</EmptyHint>;
   } else if (!runtime) {
-    body = <EmptyHint>Loading…</EmptyHint>;
+    body = <EmptyHint>{t("empty.loading")}</EmptyHint>;
   } else {
     const { execStatus, execError, lastResult } = runtime;
 
     if (execStatus === "idle" && !lastResult) {
-      body = <EmptyHint>Run a query to see results.</EmptyHint>;
+      body = <EmptyHint>{t("empty.run-prompt")}</EmptyHint>;
     } else if (execStatus === "running" && !lastResult) {
-      body = <EmptyHint>Running query…</EmptyHint>;
+      body = <EmptyHint>{t("empty.running")}</EmptyHint>;
     } else if (execStatus === "running" && lastResult) {
       body = <GridWithBanners result={lastResult} />;
     } else if (execStatus === "ok" && lastResult) {
@@ -114,7 +116,7 @@ export function ResultPanel() {
       // that misleads the user into thinking the failed query "returned" those
       // columns. Show the error full-screen, regardless of whether a stale
       // lastResult is still around.
-      body = <FullScreenError message={execError ?? "Unknown error"} />;
+      body = <FullScreenError message={execError ?? t("error.unknown")} />;
     } else {
       body = <EmptyHint>—</EmptyHint>;
     }
