@@ -21,27 +21,37 @@ use crate::datasource::types::{
     TestConnectionResult,
 };
 
-static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
+static STRICT_CLIENT: OnceLock<Client> = OnceLock::new();
+static LAX_CLIENT: OnceLock<Client> = OnceLock::new();
 
-fn http_client() -> &'static Client {
-    HTTP_CLIENT.get_or_init(|| {
-        Client::builder()
-            .user_agent("Taoscope/0.1")
-            .pool_idle_timeout(Duration::from_secs(90))
-            .build()
-            .expect("failed to build reqwest client")
-    })
+fn build_client(accept_invalid_certs: bool) -> Client {
+    Client::builder()
+        .user_agent("Taoscope/0.1")
+        .pool_idle_timeout(Duration::from_secs(90))
+        .danger_accept_invalid_certs(accept_invalid_certs)
+        .build()
+        .expect("failed to build reqwest client")
+}
+
+fn http_client(allow_invalid_certs: bool) -> &'static Client {
+    if allow_invalid_certs {
+        LAX_CLIENT.get_or_init(|| build_client(true))
+    } else {
+        STRICT_CLIENT.get_or_init(|| build_client(false))
+    }
 }
 
 fn endpoint(conn: &Connection, db: Option<&str>) -> String {
+    let scheme = conn.protocol.as_str();
     match db {
         Some(d) => format!(
-            "http://{}:{}/rest/sql/{}",
+            "{}://{}:{}/rest/sql/{}",
+            scheme,
             conn.host,
             conn.port,
             urlencoding::encode(d)
         ),
-        None => format!("http://{}:{}/rest/sql", conn.host, conn.port),
+        None => format!("{}://{}:{}/rest/sql", scheme, conn.host, conn.port),
     }
 }
 
@@ -76,7 +86,7 @@ async fn execute_sql(
     db: Option<&str>,
     sql: &str,
 ) -> Result<TdResponse, DataSourceError> {
-    let resp = http_client()
+    let resp = http_client(conn.allow_invalid_certs)
         .post(endpoint(conn, db))
         .header("Authorization", auth_header(conn))
         .header("Content-Type", "text/plain")

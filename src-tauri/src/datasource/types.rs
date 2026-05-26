@@ -20,6 +20,28 @@ impl Default for AuthMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Protocol {
+    Http,
+    Https,
+}
+
+impl Default for Protocol {
+    fn default() -> Self {
+        Protocol::Http
+    }
+}
+
+impl Protocol {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Protocol::Http => "http",
+            Protocol::Https => "https",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
@@ -36,6 +58,10 @@ pub struct Connection {
     pub auth_mode: AuthMode,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub token: Option<String>,
+    #[serde(default)]
+    pub protocol: Protocol,
+    #[serde(default)]
+    pub allow_invalid_certs: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +78,10 @@ pub struct ConnectionInput {
     pub auth_mode: AuthMode,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub token: Option<String>,
+    #[serde(default)]
+    pub protocol: Protocol,
+    #[serde(default)]
+    pub allow_invalid_certs: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

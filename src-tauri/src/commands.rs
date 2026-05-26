@@ -93,6 +93,8 @@ pub async fn test_connection_config(
         status: crate::datasource::types::ConnectionStatus::Online,
         auth_mode: input.auth_mode,
         token: input.token,
+        protocol: input.protocol,
+        allow_invalid_certs: input.allow_invalid_certs,
     };
     Ok(http_client::test_connection(&conn).await)
 }

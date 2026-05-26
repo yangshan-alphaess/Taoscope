@@ -57,6 +57,11 @@ ALTER TABLE connections ADD COLUMN auth_mode TEXT NOT NULL DEFAULT 'basic' CHECK
 ALTER TABLE connections ADD COLUMN token TEXT;
 "#;
 
+const SCHEMA_V3_MIGRATION: &str = r#"
+ALTER TABLE connections ADD COLUMN protocol TEXT NOT NULL DEFAULT 'http' CHECK (protocol IN ('http','https'));
+ALTER TABLE connections ADD COLUMN allow_invalid_certs INTEGER NOT NULL DEFAULT 0;
+"#;
+
 pub fn migrate(conn: &Connection) -> Result<(), DataSourceError> {
     conn.execute_batch(SCHEMA_V1).map_err(map_err)?;
 
@@ -73,6 +78,11 @@ pub fn migrate(conn: &Connection) -> Result<(), DataSourceError> {
     if version < 2 {
         conn.execute_batch(SCHEMA_V2_MIGRATION).map_err(map_err)?;
         version = 2;
+    }
+
+    if version < 3 {
+        conn.execute_batch(SCHEMA_V3_MIGRATION).map_err(map_err)?;
+        version = 3;
     }
 
     conn.execute(

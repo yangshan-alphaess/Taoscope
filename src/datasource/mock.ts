@@ -58,10 +58,11 @@ function loadConnectionsFromStorage(): Connection[] {
         typeof c.host === "string",
     );
     if (!valid) return [];
-    // Backfill authMode for pre-token-auth localStorage entries.
+    // Backfill new fields for pre-existing localStorage entries.
     return (parsed as Array<Partial<Connection> & Connection>).map((c) => ({
       ...c,
       authMode: c.authMode ?? "basic",
+      protocol: c.protocol ?? "http",
     }));
   } catch {
     return [];
@@ -137,6 +138,8 @@ export class MockDataSource implements DataSource {
       status: "online",
       authMode: input.authMode,
       token: input.token,
+      protocol: input.protocol,
+      allowInvalidCerts: input.allowInvalidCerts,
     };
     this._connections.push(created);
     this.persist();
@@ -175,6 +178,8 @@ export class MockDataSource implements DataSource {
       color: input.color,
       authMode: input.authMode,
       token: nextToken,
+      protocol: input.protocol,
+      allowInvalidCerts: input.allowInvalidCerts,
     };
     this.persist();
   }

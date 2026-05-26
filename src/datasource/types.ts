@@ -37,6 +37,8 @@ export interface Column {
 
 export type AuthMode = "basic" | "token";
 
+export type Protocol = "http" | "https";
+
 export interface Connection {
   id: string;
   name: string;
@@ -50,6 +52,9 @@ export interface Connection {
   authMode: AuthMode;
   /** Bearer-style token used when authMode === 'token'. */
   token?: string;
+  protocol: Protocol;
+  /** Skip TLS certificate validation (only meaningful for https). */
+  allowInvalidCerts?: boolean;
 }
 
 export interface ConnectionInput {
@@ -61,6 +66,8 @@ export interface ConnectionInput {
   color?: string;
   authMode: AuthMode;
   token?: string;
+  protocol: Protocol;
+  allowInvalidCerts?: boolean;
 }
 
 export interface Database {

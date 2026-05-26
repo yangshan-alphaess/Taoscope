@@ -40,6 +40,8 @@ const DEFAULT_FORM: ConnectionInput = {
   password: "",
   authMode: "basic",
   token: "",
+  protocol: "http",
+  allowInvalidCerts: false,
 };
 
 function validate(
@@ -114,6 +116,8 @@ export function ConnectionFormDialog({
         color: initial.color,
         authMode: initial.authMode ?? "basic",
         token: "",
+        protocol: initial.protocol ?? "http",
+        allowInvalidCerts: initial.allowInvalidCerts ?? false,
       });
     } else {
       setForm(DEFAULT_FORM);
@@ -204,13 +208,73 @@ export function ConnectionFormDialog({
             />
           </Field>
           <Field label="Host" error={errors.host}>
-            <Input
-              value={form.host}
-              onChange={(e) => update("host", e.target.value)}
-              placeholder="tdengine.example.com"
-              className={inputClass}
-            />
+            <div className="flex gap-1.5">
+              <select
+                value={form.protocol}
+                onChange={(e) =>
+                  setForm((prev) => {
+                    const nextProtocol = e.target.value as "http" | "https";
+                    return {
+                      ...prev,
+                      protocol: nextProtocol,
+                      allowInvalidCerts:
+                        nextProtocol === "https" ? prev.allowInvalidCerts : false,
+                    };
+                  })
+                }
+                className={cn(
+                  "h-8 rounded border border-input bg-background px-2 text-xs",
+                  "focus-visible:outline-none focus-visible:ring-1",
+                )}
+              >
+                <option value="http">http://</option>
+                <option value="https">https://</option>
+              </select>
+              <Input
+                value={form.host}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  // If a user pastes a full URL, split scheme + host:port.
+                  const match = /^(https?):\/\/([^/:]+)(?::(\d+))?/i.exec(raw);
+                  if (match && match[1] && match[2]) {
+                    const scheme = match[1].toLowerCase() as "http" | "https";
+                    const host = match[2];
+                    const portStr = match[3];
+                    setForm((prev) => ({
+                      ...prev,
+                      protocol: scheme,
+                      host,
+                      port: portStr ? Number.parseInt(portStr, 10) : prev.port,
+                    }));
+                  } else {
+                    update("host", raw);
+                  }
+                }}
+                placeholder="tdengine.example.com"
+                className={cn(inputClass, "flex-1")}
+              />
+            </div>
           </Field>
+          {form.protocol === "https" && (
+            <div className="grid gap-1 -mt-1">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.allowInvalidCerts ?? false}
+                  onChange={(e) =>
+                    update("allowInvalidCerts", e.target.checked)
+                  }
+                  className="h-3.5 w-3.5"
+                />
+                <span>
+                  Allow invalid certificates{" "}
+                  <span className="text-destructive">
+                    (self-signed dev only)
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
           <Field label="Port" error={errors.port}>
             <Input
               type="number"
