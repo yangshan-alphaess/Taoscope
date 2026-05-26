@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
@@ -90,6 +91,7 @@ function nameMatches(name: string, q: string): boolean {
 }
 
 export function ResourcesPanel() {
+  const { t } = useTranslation("connection");
   const ds = useDataSource();
   const connections = useAppState((s) => s.connections);
   const setConnections = useAppState((s) => s.setConnections);
@@ -280,10 +282,9 @@ export function ResourcesPanel() {
 
   async function handleDeleteConnection(c: Connection) {
     const ok = await confirm({
-      title: `Delete connection "${c.name}"?`,
-      description:
-        "Consoles bound to this connection remain but can no longer query.",
-      confirmLabel: "Delete",
+      title: t("resources-panel.delete-confirm.title", { name: c.name }),
+      description: t("resources-panel.delete-confirm.description"),
+      confirmLabel: t("resources-panel.context-menu.delete"),
       danger: true,
     });
     if (!ok) return;
@@ -291,7 +292,7 @@ export function ResourcesPanel() {
       await ds.deleteConnection(c.id);
       await refreshConnections();
       clearConnCache(c.id);
-      toast.success("Connection deleted");
+      toast.success(t("toast.deleted"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(msg);
@@ -300,7 +301,7 @@ export function ResourcesPanel() {
 
   async function handleRefreshConnection(c: Connection) {
     if (c.status === "offline") {
-      toast.error(`${c.name} is offline`);
+      toast.error(t("toast.offline", { name: c.name }));
       return;
     }
     clearConnCache(c.id);
@@ -314,7 +315,7 @@ export function ResourcesPanel() {
     try {
       const list = await ds.listDatabases(c.id);
       setDbsByConn((prev) => ({ ...prev, [c.id]: list }));
-      toast.success(`Refreshed ${c.name}`);
+      toast.success(t("toast.refreshed", { name: c.name }));
     } catch (err) {
       setDbsByConn((prev) => ({ ...prev, [c.id]: [] }));
       const msg = err instanceof Error ? err.message : String(err);
@@ -348,7 +349,7 @@ export function ResourcesPanel() {
       ]);
       setStablesByDb((prev) => ({ ...prev, [key]: stbs }));
       setTablesByDb((prev) => ({ ...prev, [key]: paged.items }));
-      toast.success(`Refreshed ${db}`);
+      toast.success(t("toast.refreshed", { name: db }));
     } catch (err) {
       setStablesByDb((prev) => ({ ...prev, [key]: [] }));
       setTablesByDb((prev) => ({ ...prev, [key]: [] }));
@@ -488,7 +489,7 @@ export function ResourcesPanel() {
           total: 0,
           nextPage: 1,
           loading: false,
-          error: "Failed to load. Retry?",
+          error: t("resources-panel.tree.error"),
         },
       }));
     }
@@ -530,7 +531,7 @@ export function ResourcesPanel() {
         if (!cur) return prev;
         return {
           ...prev,
-          [key]: { ...cur, loading: false, error: "Failed to load. Retry?" },
+          [key]: { ...cur, loading: false, error: t("resources-panel.tree.error") },
         };
       });
     }
@@ -597,17 +598,17 @@ export function ResourcesPanel() {
     <section className="bg-background flex h-full min-h-0 flex-col">
       <div className="border-border flex h-9 shrink-0 items-center justify-between border-b pr-1 pl-3">
         <h2 className="text-xs font-semibold tracking-wide uppercase">
-          Resources
+          {t("resources-panel.title")}
         </h2>
         <button
           type="button"
           onClick={() => setDialogState({ open: true, mode: "create" })}
           className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center gap-1 rounded-sm px-2 py-1 text-xs"
-          aria-label="New connection"
-          title="New connection"
+          aria-label={t("resources-panel.new")}
+          title={t("resources-panel.new")}
         >
           <Plus className="h-3.5 w-3.5" />
-          <span>New connection</span>
+          <span>{t("resources-panel.new")}</span>
         </button>
       </div>
 
@@ -617,7 +618,7 @@ export function ResourcesPanel() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Filter resources..."
+          placeholder={t("resources-panel.filter-placeholder")}
           className="bg-transparent text-foreground placeholder:text-muted-foreground/60 focus:outline-none h-7 flex-1 text-xs"
         />
         {query && (
@@ -625,7 +626,7 @@ export function ResourcesPanel() {
             type="button"
             onClick={() => setQuery("")}
             className="text-muted-foreground hover:text-foreground rounded-sm p-0.5"
-            aria-label="Clear filter"
+            aria-label={t("resources-panel.filter-placeholder")}
           >
             <X className="h-3 w-3" />
           </button>
@@ -634,10 +635,12 @@ export function ResourcesPanel() {
 
       <div className="flex-1 overflow-y-auto py-1 text-xs">
         {connections.length === 0 ? (
-          <p className="text-muted-foreground p-3">No connections yet.</p>
+          <p className="text-muted-foreground p-3">
+            {t("resources-panel.empty")}
+          </p>
         ) : visibleConnections.length === 0 ? (
           <p className="text-muted-foreground/70 px-3 py-1 italic">
-            No matches.
+            {t("resources-panel.empty")}
           </p>
         ) : (
           visibleConnections.map((c) => {
@@ -691,7 +694,7 @@ export function ResourcesPanel() {
                             }}
                           >
                             <RefreshCw className="h-3.5 w-3.5" />
-                            Refresh
+                            {t("resources-panel.context-menu.refresh")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => {
@@ -703,7 +706,7 @@ export function ResourcesPanel() {
                             }}
                           >
                             <Pencil className="h-3.5 w-3.5" />
-                            Edit
+                            {t("resources-panel.context-menu.edit")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -713,7 +716,7 @@ export function ResourcesPanel() {
                             className="text-destructive focus:text-destructive"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                            Delete
+                            {t("resources-panel.context-menu.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -726,12 +729,7 @@ export function ResourcesPanel() {
                         void createConsole(c.id);
                       }}
                     >
-                      New Console
-                      {isOffline && (
-                        <span className="text-muted-foreground ml-2 text-xs">
-                          (offline)
-                        </span>
-                      )}
+                      {t("resources-panel.context-menu.new-console")}
                     </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
@@ -1129,6 +1127,7 @@ function TableBody({
   onToggleChildren,
   onLoadMoreChildren,
 }: TableBodyProps) {
+  const { t } = useTranslation("connection");
   const key = `${connId}|${dbName}|${tableName}`;
   const colsOpen = filterActive || expandedColumns.has(key);
   const childrenOpen = filterActive || expandedChildren.has(key);
@@ -1144,7 +1143,7 @@ function TableBody({
         ) : (
           <ChevronRight className="h-3 w-3 shrink-0" />
         )}
-        <span className="truncate">Columns &amp; tags</span>
+        <span className="truncate">{t("resources-panel.tree.columns-tags")}</span>
       </button>
       {colsOpen && (
         <ColumnsList state={columnsByTable[key]} query={query} />
@@ -1162,7 +1161,7 @@ function TableBody({
             ) : (
               <ChevronRight className="h-3 w-3 shrink-0" />
             )}
-            <span className="truncate">Child tables</span>
+            <span className="truncate">{t("resources-panel.tree.child-tables")}</span>
             {typeof childCount === "number" && (
               <span className="text-muted-foreground/70 ml-auto font-mono">
                 {childCount}
@@ -1248,11 +1247,12 @@ function ChildrenList({
   query: string;
   onLoadMore: () => void;
 }) {
+  const { t: tr } = useTranslation("connection");
   if (!state) {
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground px-3 py-1 text-[11px]">
-          Loading…
+          {tr("resources-panel.tree.loading")}
         </p>
       </div>
     );
@@ -1297,7 +1297,9 @@ function ChildrenList({
         </div>
       ))}
       {state.loading && (
-        <p className="text-muted-foreground px-3 py-1 text-[11px]">Loading…</p>
+        <p className="text-muted-foreground px-3 py-1 text-[11px]">
+          {tr("resources-panel.tree.loading")}
+        </p>
       )}
       {remaining > 0 && !state.loading && (
         <button

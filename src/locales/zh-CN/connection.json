@@ -1,1 +1,87 @@
-{}
+{
+  "form": {
+    "title-create": "新建连接",
+    "title-edit": "编辑连接",
+    "field": {
+      "name": "名称",
+      "host": "主机",
+      "port": "端口",
+      "user": "用户",
+      "auth": "认证",
+      "password": "密码",
+      "token": "Token",
+      "timeout": "超时（秒）"
+    },
+    "placeholder": {
+      "name": "my-connection",
+      "host": "tdengine.example.com",
+      "password-keep": "留空以保留原值",
+      "token-keep": "留空以保留原值",
+      "token-new": "粘贴 TDengine Cloud token"
+    },
+    "auth-mode": {
+      "basic": "Basic",
+      "token": "Token"
+    },
+    "validation": {
+      "name-required": "名称必填",
+      "name-exists": "连接名称已存在",
+      "host-required": "主机必填",
+      "port-range": "端口必须在 1-65535 之间",
+      "user-required": "用户必填",
+      "token-required": "Token 必填",
+      "timeout-range": "超时必须在 1–600 秒之间"
+    },
+    "https": {
+      "allow-invalid": "允许无效证书",
+      "allow-invalid-warning": "（仅限自签名开发环境）"
+    },
+    "actions": {
+      "test": "测试",
+      "testing": "测试中…",
+      "save": "保存",
+      "saving": "保存中…",
+      "cancel": "取消"
+    },
+    "test-result": {
+      "ok": "✓ 连接成功",
+      "fail-prefix": "✕"
+    }
+  },
+  "toast": {
+    "test-ok": "连接成功",
+    "test-fail": "连接失败",
+    "created": "连接已创建",
+    "updated": "连接已更新",
+    "deleted": "连接已删除",
+    "offline": "{{name}} 已离线",
+    "refreshed": "已刷新 {{name}}"
+  },
+  "resources-panel": {
+    "title": "资源",
+    "new": "新建连接",
+    "filter-placeholder": "过滤资源…",
+    "empty": "暂无连接。",
+    "delete-confirm": {
+      "title": "删除连接 \"{{name}}\"？",
+      "description": "绑定到此连接的控制台仍会保留，但将无法继续查询。"
+    },
+    "context-menu": {
+      "edit": "编辑…",
+      "delete": "删除",
+      "refresh": "刷新",
+      "test": "测试连接",
+      "new-console": "新建控制台",
+      "expand-all": "展开全部",
+      "collapse-all": "折叠全部"
+    },
+    "tree": {
+      "loading": "加载中…",
+      "error": "错误",
+      "no-databases": "暂无数据库",
+      "columns-tags": "列与标签",
+      "child-tables": "子表",
+      "no-tables": "暂无表"
+    }
+  }
+}

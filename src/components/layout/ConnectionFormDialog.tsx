@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
@@ -81,41 +83,42 @@ function validate(
   selfId: string | undefined,
   mode: Mode,
   initial: Connection | undefined,
+  t: TFunction,
 ): FieldErrors {
   const errors: FieldErrors = {};
   const name = form.name.trim();
   if (name === "") {
-    errors.name = "Name is required";
+    errors.name = t("form.validation.name-required");
   } else if (
     existing.some((c) => c.id !== selfId && c.name === name)
   ) {
-    errors.name = "Connection name already exists";
+    errors.name = t("form.validation.name-exists");
   }
   if (form.host.trim() === "") {
-    errors.host = "Host is required";
+    errors.host = t("form.validation.host-required");
   }
   if (
     !Number.isInteger(form.port) ||
     form.port < 1 ||
     form.port > 65535
   ) {
-    errors.port = "Port must be 1-65535";
+    errors.port = t("form.validation.port-range");
   }
   if (form.user.trim() === "") {
-    errors.user = "User is required";
+    errors.user = t("form.validation.user-required");
   }
   if (form.authMode === "token") {
     const tokenEmpty = (form.token ?? "").length === 0;
     const switchedIntoToken =
       mode === "create" || initial?.authMode !== "token";
     if (tokenEmpty && switchedIntoToken) {
-      errors.token = "Token is required";
+      errors.token = t("form.validation.token-required");
     }
   }
   if (form.timeoutMs !== undefined) {
     const sec = form.timeoutMs / 1000;
     if (!Number.isInteger(sec) || sec < 1 || sec > 600) {
-      errors.timeoutMs = "Timeout must be 1–600 seconds";
+      errors.timeoutMs = t("form.validation.timeout-range");
     }
   }
   return errors;
@@ -128,6 +131,7 @@ export function ConnectionFormDialog({
   onOpenChange,
   onSaved,
 }: ConnectionFormDialogProps) {
+  const { t } = useTranslation("connection");
   const ds = useDataSource();
   const connections = useAppState((s) => s.connections);
 
@@ -165,7 +169,7 @@ export function ConnectionFormDialog({
     setBusy(null);
   }, [open, mode, initial]);
 
-  const errors = validate(form, connections, initial?.id, mode, initial);
+  const errors = validate(form, connections, initial?.id, mode, initial, t);
   const hasErrors = Object.keys(errors).length > 0;
 
   function update<K extends keyof ConnectionInput>(
@@ -195,9 +199,9 @@ export function ConnectionFormDialog({
       const result = await ds.testConnectionConfig(effective);
       setTestResult(result);
       if (result.ok) {
-        toast.success("Connection OK");
+        toast.success(t("toast.test-ok"));
       } else {
-        toast.error(result.message ?? "Connection failed");
+        toast.error(result.message ?? t("toast.test-fail"));
       }
     } finally {
       setBusy(null);
@@ -211,11 +215,11 @@ export function ConnectionFormDialog({
       const trimmed: ConnectionInput = { ...form, name: form.name.trim() };
       if (mode === "create") {
         const created = await ds.createConnection(trimmed);
-        toast.success("Connection created");
+        toast.success(t("toast.created"));
         onSaved?.(created);
       } else if (initial) {
         await ds.updateConnection(initial.id, trimmed);
-        toast.success("Connection updated");
+        toast.success(t("toast.updated"));
         onSaved?.({ ...initial, ...trimmed });
       }
       onOpenChange(false);
@@ -232,21 +236,23 @@ export function ConnectionFormDialog({
       <DialogContent className="max-w-md gap-3 p-4 rounded-md">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold">
-            {mode === "create" ? "New Connection" : "Edit Connection"}
+            {mode === "create"
+              ? t("form.title-create")
+              : t("form.title-edit")}
           </DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-2.5 py-1">
-          <Field label="Name" error={errors.name}>
+          <Field label={t("form.field.name")} error={errors.name}>
             <Input
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
-              placeholder="my-connection"
+              placeholder={t("form.placeholder.name")}
               autoFocus
               className={inputClass}
             />
           </Field>
-          <Field label="Host" error={errors.host}>
+          <Field label={t("form.field.host")} error={errors.host}>
             <div className="flex gap-1.5">
               <select
                 value={schemeLabel(form.protocol, form.transport)}
@@ -308,7 +314,7 @@ export function ConnectionFormDialog({
                     update("host", raw);
                   }
                 }}
-                placeholder="tdengine.example.com"
+                placeholder={t("form.placeholder.host")}
                 className={cn(inputClass, "flex-1")}
               />
             </div>
@@ -330,15 +336,15 @@ export function ConnectionFormDialog({
                   className="h-3.5 w-3.5"
                 />
                 <span>
-                  Allow invalid certificates{" "}
+                  {t("form.https.allow-invalid")}{" "}
                   <span className="text-destructive">
-                    (self-signed dev only)
+                    {t("form.https.allow-invalid-warning")}
                   </span>
                 </span>
               </label>
             </div>
           )}
-          <Field label="Port" error={errors.port}>
+          <Field label={t("form.field.port")} error={errors.port}>
             <Input
               type="number"
               value={form.port}
@@ -348,14 +354,14 @@ export function ConnectionFormDialog({
               className={inputClass}
             />
           </Field>
-          <Field label="User" error={errors.user}>
+          <Field label={t("form.field.user")} error={errors.user}>
             <Input
               value={form.user}
               onChange={(e) => update("user", e.target.value)}
               className={inputClass}
             />
           </Field>
-          <Field label="Auth">
+          <Field label={t("form.field.auth")}>
             <div className="inline-flex h-8 rounded border border-input bg-background p-0.5 text-xs">
               <button
                 type="button"
@@ -367,7 +373,7 @@ export function ConnectionFormDialog({
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Basic
+                {t("form.auth-mode.basic")}
               </button>
               <button
                 type="button"
@@ -379,38 +385,38 @@ export function ConnectionFormDialog({
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Token
+                {t("form.auth-mode.token")}
               </button>
             </div>
           </Field>
           {form.authMode === "basic" ? (
-            <Field label="Password" error={errors.password}>
+            <Field label={t("form.field.password")} error={errors.password}>
               <Input
                 type="password"
                 value={form.password}
                 onChange={(e) => update("password", e.target.value)}
                 placeholder={
-                  mode === "edit" ? "Leave empty to keep current" : ""
+                  mode === "edit" ? t("form.placeholder.password-keep") : ""
                 }
                 className={inputClass}
               />
             </Field>
           ) : (
-            <Field label="Token" error={errors.token}>
+            <Field label={t("form.field.token")} error={errors.token}>
               <Input
                 type="password"
                 value={form.token ?? ""}
                 onChange={(e) => update("token", e.target.value)}
                 placeholder={
                   mode === "edit"
-                    ? "Leave empty to keep current"
-                    : "Paste TDengine Cloud token"
+                    ? t("form.placeholder.token-keep")
+                    : t("form.placeholder.token-new")
                 }
                 className={inputClass}
               />
             </Field>
           )}
-          <Field label="Timeout (seconds)" error={errors.timeoutMs}>
+          <Field label={t("form.field.timeout")} error={errors.timeoutMs}>
             <Input
               type="number"
               min={1}
@@ -443,8 +449,10 @@ export function ConnectionFormDialog({
             )}
           >
             {testResult.ok
-              ? "✓ Connection OK"
-              : `✕ ${testResult.message ?? "Connection failed"}`}
+              ? t("form.test-result.ok")
+              : `${t("form.test-result.fail-prefix")} ${
+                  testResult.message ?? t("toast.test-fail")
+                }`}
           </p>
         )}
 
@@ -456,7 +464,7 @@ export function ConnectionFormDialog({
             disabled={busy !== null}
             className={btnClass}
           >
-            {busy === "test" ? "Testing…" : "Test"}
+            {busy === "test" ? t("form.actions.testing") : t("form.actions.test")}
           </Button>
           <div className="flex gap-1.5">
             <Button
@@ -466,7 +474,7 @@ export function ConnectionFormDialog({
               disabled={busy === "save"}
               className={btnClass}
             >
-              Cancel
+              {t("form.actions.cancel")}
             </Button>
             <Button
               type="button"
@@ -474,7 +482,7 @@ export function ConnectionFormDialog({
               disabled={hasErrors || busy !== null}
               className={btnClass}
             >
-              {busy === "save" ? "Saving…" : "Save"}
+              {busy === "save" ? t("form.actions.saving") : t("form.actions.save")}
             </Button>
           </div>
         </DialogFooter>

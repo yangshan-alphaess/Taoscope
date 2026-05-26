@@ -1,1 +1,87 @@
-{}
+{
+  "form": {
+    "title-create": "New Connection",
+    "title-edit": "Edit Connection",
+    "field": {
+      "name": "Name",
+      "host": "Host",
+      "port": "Port",
+      "user": "User",
+      "auth": "Auth",
+      "password": "Password",
+      "token": "Token",
+      "timeout": "Timeout (seconds)"
+    },
+    "placeholder": {
+      "name": "my-connection",
+      "host": "tdengine.example.com",
+      "password-keep": "Leave empty to keep current",
+      "token-keep": "Leave empty to keep current",
+      "token-new": "Paste TDengine Cloud token"
+    },
+    "auth-mode": {
+      "basic": "Basic",
+      "token": "Token"
+    },
+    "validation": {
+      "name-required": "Name is required",
+      "name-exists": "Connection name already exists",
+      "host-required": "Host is required",
+      "port-range": "Port must be 1-65535",
+      "user-required": "User is required",
+      "token-required": "Token is required",
+      "timeout-range": "Timeout must be 1–600 seconds"
+    },
+    "https": {
+      "allow-invalid": "Allow invalid certificates",
+      "allow-invalid-warning": "(self-signed dev only)"
+    },
+    "actions": {
+      "test": "Test",
+      "testing": "Testing…",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "test-result": {
+      "ok": "✓ Connection OK",
+      "fail-prefix": "✕"
+    }
+  },
+  "toast": {
+    "test-ok": "Connection OK",
+    "test-fail": "Connection failed",
+    "created": "Connection created",
+    "updated": "Connection updated",
+    "deleted": "Connection deleted",
+    "offline": "{{name}} is offline",
+    "refreshed": "Refreshed {{name}}"
+  },
+  "resources-panel": {
+    "title": "Resources",
+    "new": "New connection",
+    "filter-placeholder": "Filter resources...",
+    "empty": "No connections yet.",
+    "delete-confirm": {
+      "title": "Delete connection \"{{name}}\"?",
+      "description": "Consoles bound to this connection remain but can no longer query."
+    },
+    "context-menu": {
+      "edit": "Edit…",
+      "delete": "Delete",
+      "refresh": "Refresh",
+      "test": "Test connection",
+      "new-console": "New Console",
+      "expand-all": "Expand all",
+      "collapse-all": "Collapse all"
+    },
+    "tree": {
+      "loading": "Loading…",
+      "error": "Error",
+      "no-databases": "No databases",
+      "columns-tags": "Columns & tags",
+      "child-tables": "Child tables",
+      "no-tables": "No tables"
+    }
+  }
+}
