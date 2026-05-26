@@ -40,9 +40,11 @@ function die(msg) {
 }
 
 function sh(cmd, opts = {}) {
-  return execSync(cmd, { stdio: "pipe", cwd: repoRoot, ...opts })
-    .toString()
-    .trim();
+  const out = execSync(cmd, { stdio: "pipe", cwd: repoRoot, ...opts });
+  // With `stdio: "inherit"` execSync returns null (output went to the
+  // terminal directly). Callers that don't need the captured stdout pass
+  // inherit so the user can see long-running commands like cargo check.
+  return out == null ? "" : out.toString().trim();
 }
 
 function isCleanWorktree() {
