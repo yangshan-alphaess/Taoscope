@@ -1,6 +1,7 @@
 pub mod db;
 pub mod error;
 pub mod http_client;
+pub mod inflight;
 pub mod mock;
 pub mod sql_builder;
 pub mod state;

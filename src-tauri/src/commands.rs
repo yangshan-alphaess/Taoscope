@@ -12,6 +12,7 @@ use std::sync::Mutex;
 use tauri::State;
 
 use crate::datasource::error::DataSourceError;
+use crate::datasource::inflight::InFlightRegistry;
 use crate::datasource::state::Store;
 use crate::datasource::{transport, ws_client};
 use crate::datasource::types::{
@@ -155,12 +156,28 @@ pub async fn describe_table(
 #[tauri::command]
 pub async fn run_sql(
     state: State<'_, Mutex<Store>>,
+    registry: State<'_, InFlightRegistry>,
     conn_id: String,
     db: Option<String>,
     sql: String,
+    query_id: String,
 ) -> Result<QueryResult, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
-    transport::run_sql(&conn, db.as_deref(), &sql).await
+    let token = registry.register(&query_id);
+    let result = tokio::select! {
+        res = transport::run_sql(&conn, db.as_deref(), &sql) => res,
+        _ = token.cancelled() => Err(DataSourceError::Other("Query cancelled".into())),
+    };
+    registry.unregister(&query_id);
+    result
+}
+
+#[tauri::command]
+pub fn cancel_query(
+    registry: State<'_, InFlightRegistry>,
+    query_id: String,
+) -> Result<bool, DataSourceError> {
+    Ok(registry.cancel(&query_id))
 }
 
 // ── Scratch ─────────────────────────────────────────────────────────────

@@ -25,6 +25,8 @@ export interface ConsoleRuntimeEntry {
   execError: string | null;
   gridState: GridState;
   history: HistoryEntry[];
+  /** UUID of the currently in-flight runSql; null when idle. */
+  runningQueryId: string | null;
 }
 
 const DEFAULT_RUNTIME: ConsoleRuntimeEntry = {
@@ -34,6 +36,7 @@ const DEFAULT_RUNTIME: ConsoleRuntimeEntry = {
   execError: null,
   gridState: DEFAULT_GRID_STATE,
   history: [],
+  runningQueryId: null,
 };
 
 interface AppState {
@@ -56,7 +59,7 @@ interface AppState {
     init: Partial<ConsoleRuntimeEntry>,
   ) => void;
   setScratch: (id: string, scratch: string) => void;
-  setRunStarted: (id: string) => void;
+  setRunStarted: (id: string, queryId: string) => void;
   setRunOk: (id: string, result: QueryResult) => void;
   setRunError: (id: string, message: string) => void;
   setGridState: (id: string, state: GridState) => void;
@@ -117,13 +120,18 @@ export const useAppState = create<AppState>((set) => ({
         },
       };
     }),
-  setRunStarted: (id) =>
+  setRunStarted: (id, queryId) =>
     set((state) => {
       const prev = state.consoleRuntime[id] ?? DEFAULT_RUNTIME;
       return {
         consoleRuntime: {
           ...state.consoleRuntime,
-          [id]: { ...prev, execStatus: "running", execError: null },
+          [id]: {
+            ...prev,
+            execStatus: "running",
+            execError: null,
+            runningQueryId: queryId,
+          },
         },
       };
     }),
@@ -139,6 +147,7 @@ export const useAppState = create<AppState>((set) => ({
             execError: null,
             lastResult: result,
             gridState: DEFAULT_GRID_STATE,
+            runningQueryId: null,
           },
         },
       };
@@ -149,7 +158,12 @@ export const useAppState = create<AppState>((set) => ({
       return {
         consoleRuntime: {
           ...state.consoleRuntime,
-          [id]: { ...prev, execStatus: "error", execError: message },
+          [id]: {
+            ...prev,
+            execStatus: "error",
+            execError: message,
+            runningQueryId: null,
+          },
         },
       };
     }),

@@ -36,6 +36,13 @@ function FullScreenError({ message }: { message: string }) {
       </div>
     );
   }
+  if (message.startsWith("Query cancelled")) {
+    return (
+      <div className="flex h-full items-center justify-center px-4">
+        <p className="text-muted-foreground text-xs">Query was cancelled.</p>
+      </div>
+    );
+  }
   return (
     <div className="flex h-full items-center justify-center px-4">
       <p className="text-destructive text-xs">

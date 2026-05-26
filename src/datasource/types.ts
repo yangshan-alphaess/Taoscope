@@ -185,7 +185,12 @@ export interface DataSource {
     connId: string,
     db: string | null,
     sql: string,
+    queryId?: string,
   ): Promise<QueryResult>;
+  /** Cancel an in-flight query identified by its `queryId`. Returns true if
+   * the query was found and cancelled, false if it had already finished or
+   * never registered. */
+  cancelQuery(queryId: string): Promise<boolean>;
 
   loadScratch(consoleId: string): Promise<string>;
   saveScratch(consoleId: string, content: string): Promise<void>;

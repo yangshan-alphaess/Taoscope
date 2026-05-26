@@ -251,13 +251,45 @@ export class MockDataSource implements DataSource {
     return [];
   }
 
+  /** Map of in-flight mock query IDs → cancel handlers. */
+  private pending = new Map<string, () => void>();
+
   async runSql(
     _connId: string,
     _db: string | null,
-    _sql: string,
+    sql: string,
+    queryId?: string,
   ): Promise<QueryResult> {
-    await tick();
-    return { ...EMPTY_QUERY_RESULT, columns: [], rows: [] };
+    const id = queryId ?? nanoid();
+    // Simulate cancellable async query: long-running SQL strings starting
+    // with `LONG_` resolve after 5s so cancel can be exercised in dev.
+    const delay = sql.startsWith("LONG_") ? 5000 : 0;
+    return new Promise<QueryResult>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const finalize = (val: QueryResult) => {
+        if (this.pending.delete(id) && timer !== null) clearTimeout(timer);
+        resolve(val);
+      };
+      this.pending.set(id, () => {
+        if (timer !== null) clearTimeout(timer);
+        this.pending.delete(id);
+        reject(new Error("Query cancelled"));
+      });
+      if (delay === 0) {
+        finalize({ ...EMPTY_QUERY_RESULT, columns: [], rows: [] });
+      } else {
+        timer = setTimeout(() => {
+          finalize({ ...EMPTY_QUERY_RESULT, columns: [], rows: [] });
+        }, delay);
+      }
+    });
+  }
+
+  async cancelQuery(queryId: string): Promise<boolean> {
+    const cancel = this.pending.get(queryId);
+    if (!cancel) return false;
+    cancel();
+    return true;
   }
 
   async loadScratch(consoleId: string): Promise<string> {

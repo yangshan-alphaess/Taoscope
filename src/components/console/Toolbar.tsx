@@ -8,7 +8,7 @@ import { useFormatActiveConsole } from "./useFormatActiveConsole";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 
 export function Toolbar() {
-  const { canRun, isRunning, run } = useRunActiveConsole();
+  const { canRun, isRunning, run, cancel } = useRunActiveConsole();
   const { canFormat, format } = useFormatActiveConsole();
 
   return (
@@ -32,8 +32,9 @@ export function Toolbar() {
       />
       <QueryHistoryButton />
       <ToolbarButton
-        disabled
-        title="Cancel running query (coming soon)"
+        onClick={cancel}
+        disabled={!isRunning}
+        title="Cancel the in-flight query"
         icon={<Square className="h-3.5 w-3.5" />}
         label="Cancel"
       />

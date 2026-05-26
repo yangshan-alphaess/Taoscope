@@ -27,6 +27,8 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 taos = { version = "0.12", default-features = false, features = ["ws-rustls"] }
 # Used directly for per-request timeouts on the ws transport.
 tokio = { version = "1", features = ["time"] }
+# CancellationToken for the in-flight query registry (add-query-cancel).
+tokio-util = { version = "0.7", default-features = false }
 # Updater (in-app upgrades). Native installers + ed25519 signature verification.
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"

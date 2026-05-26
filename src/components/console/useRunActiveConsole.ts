@@ -9,6 +9,7 @@ export interface UseRunActiveConsoleResult {
   canRun: boolean;
   isRunning: boolean;
   run: () => void;
+  cancel: () => void;
 }
 
 const HISTORY_LIMIT = 50;
@@ -67,8 +68,9 @@ export function useRunActiveConsole(): UseRunActiveConsoleResult {
 
     const prevHistory = runtime?.history ?? [];
     const injected = injectRowCapLimit(chosenSql);
-    setRunStarted(id);
-    ds.runSql(connection.id, activeConsole.currentDb, injected)
+    const queryId = crypto.randomUUID();
+    setRunStarted(id, queryId);
+    ds.runSql(connection.id, activeConsole.currentDb, injected, queryId)
       .then((r) => {
         const capped = applyRowCap(r);
         const entry: HistoryEntry = {
@@ -90,5 +92,13 @@ export function useRunActiveConsole(): UseRunActiveConsoleResult {
       });
   }
 
-  return { canRun, isRunning, run };
+  function cancel() {
+    const queryId = runtime?.runningQueryId;
+    if (!queryId) return;
+    // Fire and forget: the UI reverts to idle as soon as the in-flight
+    // promise rejects (via setRunError on "Query cancelled").
+    void ds.cancelQuery(queryId);
+  }
+
+  return { canRun, isRunning, run, cancel };
 }

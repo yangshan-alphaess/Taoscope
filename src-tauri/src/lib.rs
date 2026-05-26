@@ -30,6 +30,7 @@ pub fn run() {
             let store = crate::datasource::state::Store::open(&db_path)
                 .expect("failed to open SQLite database");
             app.manage(std::sync::Mutex::new(store));
+            app.manage(crate::datasource::inflight::InFlightRegistry::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -44,6 +45,7 @@ pub fn run() {
             commands::list_tables,
             commands::describe_table,
             commands::run_sql,
+            commands::cancel_query,
             commands::load_scratch,
             commands::save_scratch,
             commands::list_consoles,

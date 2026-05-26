@@ -72,8 +72,13 @@ export class TauriDataSource implements DataSource {
     connId: string,
     db: string | null,
     sql: string,
+    queryId: string = crypto.randomUUID(),
   ): Promise<QueryResult> {
-    return invoke<QueryResult>("run_sql", { connId, db, sql });
+    return invoke<QueryResult>("run_sql", { connId, db, sql, queryId });
+  }
+
+  async cancelQuery(queryId: string): Promise<boolean> {
+    return invoke<boolean>("cancel_query", { queryId });
   }
 
   async loadScratch(consoleId: string): Promise<string> {
