@@ -180,7 +180,10 @@ sh(`git add ${filesToStage.join(" ")}`);
 const tag = `v${next}`;
 const msg = `chore(release): ${next}`;
 sh(`git commit -m ${JSON.stringify(msg)}`);
-sh(`git tag ${tag}`);
+// Annotated tag (-a + -m) instead of a lightweight one — `git push
+// --follow-tags` only pushes annotated tags, so this is what makes the
+// release workflow actually fire on `git push --follow-tags origin main`.
+sh(`git tag -a ${tag} -m ${JSON.stringify(msg)}`);
 
 console.log(`✓ committed and tagged ${tag}`);
 console.log("→ push with:  git push --follow-tags origin main");
