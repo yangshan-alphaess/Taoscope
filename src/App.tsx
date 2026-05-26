@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { DataSourceProvider } from "@/datasource/context";
 import { createDataSource } from "@/datasource/factory";
+import { useUpdater } from "@/lib/updater";
 import { useAppState } from "@/store/appState";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { ResourcesPanel } from "@/components/layout/ResourcesPanel";
@@ -21,6 +22,7 @@ import { Toaster } from "@/components/ui/sonner";
 function App() {
   const dataSource = useMemo(() => createDataSource(), []);
   const setConsoles = useAppState((s) => s.setConsoles);
+  const checkForUpdate = useUpdater((s) => s.checkForUpdate);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +34,13 @@ function App() {
       cancelled = true;
     };
   }, [dataSource, setConsoles]);
+
+  // One silent update probe per cold start. Errors are swallowed (no network,
+  // no published release yet, etc.) so the status bar stays clean for first
+  // launches; a manual click in StatusBar always re-checks loudly.
+  useEffect(() => {
+    void checkForUpdate({ silent: true });
+  }, [checkForUpdate]);
 
   // Suppress the default browser context menu globally — the webview shouldn't
   // expose "Inspect / View Source" in a desktop app. shadcn ContextMenu (Radix)

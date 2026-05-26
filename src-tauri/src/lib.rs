@@ -19,6 +19,12 @@ fn resolve_db_path(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Updater + process plugins enable in-app upgrades. The updater pulls
+        // `latest.json` from the endpoint configured in tauri.conf.json,
+        // verifies its ed25519 signature against the bundled pubkey, and the
+        // process plugin's `relaunch()` swaps the running binary in place.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let db_path = resolve_db_path(app.handle())?;
             let store = crate::datasource::state::Store::open(&db_path)
