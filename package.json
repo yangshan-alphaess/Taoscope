@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\" \"*.{ts,tsx,js,cjs,json,md}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\" \"*.{ts,tsx,js,cjs,json,md}\"",
+    "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.2",
