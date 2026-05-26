@@ -48,6 +48,33 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
 - **ed25519-signed** payloads — the bundled public key blocks tampered updates.
 - See [docs/RELEASE.md](docs/RELEASE.md) for the publisher's SOP.
 
+## Installation
+
+Pre-built binaries are published on the [Releases page](https://github.com/yangshan-alphaess/Taoscope/releases/latest) for every tagged version.
+
+| Platform | Asset | First-time setup |
+| --- | --- | --- |
+| **macOS Apple Silicon** | `Taoscope_*_aarch64.dmg` | See [macOS Gatekeeper](#macos-gatekeeper) below |
+| **macOS Intel** | `Taoscope_*_x64.dmg` | See [macOS Gatekeeper](#macos-gatekeeper) below |
+| **Windows** | `Taoscope_*_x64-setup.exe` | SmartScreen → *More info* → *Run anyway* |
+| **Linux .deb** | `Taoscope_*_amd64.deb` | `sudo dpkg -i Taoscope_*.deb` |
+| **Linux .rpm** | `Taoscope_*.x86_64.rpm` | `sudo rpm -i Taoscope_*.rpm` |
+| **Linux portable** | `Taoscope_*_amd64.AppImage` | `chmod +x` then run |
+
+Once installed, the in-app updater takes over for every subsequent release — no need to come back to this page.
+
+### macOS Gatekeeper
+
+The macOS bundles aren't yet signed with an Apple Developer ID. On macOS 14 (Sonoma) and later the OS refuses unsigned apps outright with **"Taoscope.app is damaged and can't be opened"** — the old right-click → Open escape hatch no longer works.
+
+After dragging the app into `/Applications`, run this once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Taoscope.app
+```
+
+That strips the `com.apple.quarantine` extended attribute Gatekeeper checks for. The app launches normally afterward, and versions installed by the in-app updater don't re-trigger the warning.
+
 ## Tech stack
 
 | Layer    | Choice |
@@ -134,6 +161,6 @@ git push --follow-tags origin main   # main + tag in one shot → CI fires
 ## Status
 
 - **1.0.0**: first stable cut. Phase 1 (mock data source, UI shell) + Phase 2 (Tauri backend, real TDengine queries, persistence, OS-keychain vault) closed; auto-update channel live.
-- Code-signing certificates are **not yet** wired up — macOS users right-click → Open the first time; Windows users dismiss SmartScreen. Both `docs/RELEASE.md` and the in-app updater handle the subsequent upgrade path cleanly.
+- Code-signing certificates are **not yet** wired up — see the [Installation](#installation) section for the one-time macOS / Windows hurdles. The in-app updater handles every subsequent upgrade cleanly.
 
 See [FEATURES.md](FEATURES.md) for the long-tail enhancement backlog (TLS, query cancel, WS protocol, etc.).

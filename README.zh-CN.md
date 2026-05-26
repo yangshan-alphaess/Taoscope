@@ -48,6 +48,33 @@
 - **ed25519 签名** —— 客户端用绑定的公钥拒绝任何被篡改的更新包。
 - 发布操作手册见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## 安装使用
+
+每个发版的预编译包都在 [Releases 页面](https://github.com/yangshan-alphaess/Taoscope/releases/latest)。
+
+| 平台 | 文件 | 首次安装 |
+| --- | --- | --- |
+| **macOS Apple Silicon** | `Taoscope_*_aarch64.dmg` | 见下方 [macOS Gatekeeper](#macos-gatekeeper) |
+| **macOS Intel** | `Taoscope_*_x64.dmg` | 见下方 [macOS Gatekeeper](#macos-gatekeeper) |
+| **Windows** | `Taoscope_*_x64-setup.exe` | SmartScreen → "更多信息" → "仍要运行" |
+| **Linux .deb** | `Taoscope_*_amd64.deb` | `sudo dpkg -i Taoscope_*.deb` |
+| **Linux .rpm** | `Taoscope_*.x86_64.rpm` | `sudo rpm -i Taoscope_*.rpm` |
+| **Linux 通用** | `Taoscope_*_amd64.AppImage` | `chmod +x` 后直接运行 |
+
+装好之后，后续所有版本都由应用内 updater 接管，不需要再来 Releases 页面下载。
+
+### macOS Gatekeeper
+
+目前 macOS 包暂未配置 Apple Developer ID 代码签名。在 **macOS 14（Sonoma）及之后**，系统会以 **"Taoscope.app 已损坏，无法打开"** 直接拒绝未签名应用 —— 以前"右键 → 打开"那个绕过办法**在新系统上已经失效**。
+
+把 app 拖进 `/Applications` 之后，在终端跑一次：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Taoscope.app
+```
+
+这条命令从 app 包里递归剥掉 Gatekeeper 检查的 `com.apple.quarantine` 扩展属性。之后双击正常启动，并且通过 updater 升级的新版**不会再触发**这个警告。
+
 ## 技术栈
 
 | 层 | 选型 |
@@ -134,6 +161,6 @@ git push --follow-tags origin main   # main + 新 tag 一次推完 → CI 起跑
 ## 状态
 
 - **1.0.0**：首个稳定切片。Phase 1（mock 数据源、UI 壳）+ Phase 2（Tauri 后端、真实 TDengine 查询、持久化、OS keychain 保险箱）全部闭环；自动更新通道已上线。
-- **代码签名证书暂未配置** —— macOS 用户首次右键 → 打开；Windows 用户在 SmartScreen 上点"仍要运行"。`docs/RELEASE.md` 和应用内 updater 都已经把后续的就地升级路径处理干净。
+- **代码签名证书暂未配置** —— macOS / Windows 首次启动的一次性绕过步骤见上方[安装使用](#安装使用)章节。应用内 updater 处理后续所有版本的就地升级，不会再触发同样的提示。
 
 长尾增强候选（TLS、查询取消、WS 协议等）见 [FEATURES.md](FEATURES.md)。
