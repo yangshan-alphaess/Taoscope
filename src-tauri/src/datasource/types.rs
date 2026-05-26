@@ -7,6 +7,19 @@ pub enum ConnectionStatus {
     Offline,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthMode {
+    Basic,
+    Token,
+}
+
+impl Default for AuthMode {
+    fn default() -> Self {
+        AuthMode::Basic
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
@@ -19,6 +32,10 @@ pub struct Connection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
     pub status: ConnectionStatus,
+    #[serde(default)]
+    pub auth_mode: AuthMode,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +48,10 @@ pub struct ConnectionInput {
     pub password: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    #[serde(default)]
+    pub auth_mode: AuthMode,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

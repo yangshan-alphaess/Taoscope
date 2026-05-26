@@ -38,12 +38,16 @@ const DEFAULT_FORM: ConnectionInput = {
   port: 6041,
   user: "root",
   password: "",
+  authMode: "basic",
+  token: "",
 };
 
 function validate(
   form: ConnectionInput,
   existing: Connection[],
   selfId: string | undefined,
+  mode: Mode,
+  initial: Connection | undefined,
 ): FieldErrors {
   const errors: FieldErrors = {};
   const name = form.name.trim();
@@ -67,6 +71,14 @@ function validate(
   if (form.user.trim() === "") {
     errors.user = "User is required";
   }
+  if (form.authMode === "token") {
+    const tokenEmpty = (form.token ?? "").length === 0;
+    const switchedIntoToken =
+      mode === "create" || initial?.authMode !== "token";
+    if (tokenEmpty && switchedIntoToken) {
+      errors.token = "Token is required";
+    }
+  }
   return errors;
 }
 
@@ -89,9 +101,9 @@ export function ConnectionFormDialog({
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && initial) {
-      // Password is intentionally left empty; the field's placeholder hints
-      // that empty means "keep current". The backend skips the vault write
-      // when password is empty in update, so editing other fields never
+      // Password / token are intentionally left empty; the placeholder hints
+      // that empty means "keep current". The backend skips writing the secret
+      // when the field is empty in update, so editing other fields never
       // accidentally wipes the stored credential.
       setForm({
         name: initial.name,
@@ -100,6 +112,8 @@ export function ConnectionFormDialog({
         user: initial.user,
         password: "",
         color: initial.color,
+        authMode: initial.authMode ?? "basic",
+        token: "",
       });
     } else {
       setForm(DEFAULT_FORM);
@@ -108,7 +122,7 @@ export function ConnectionFormDialog({
     setBusy(null);
   }, [open, mode, initial]);
 
-  const errors = validate(form, connections, initial?.id);
+  const errors = validate(form, connections, initial?.id, mode, initial);
   const hasErrors = Object.keys(errors).length > 0;
 
   function update<K extends keyof ConnectionInput>(
@@ -122,13 +136,19 @@ export function ConnectionFormDialog({
     setBusy("test");
     setTestResult(null);
     try {
-      // In edit mode the password field is empty by design — fall back to
-      // the existing connection's stored password for the test probe so the
-      // user can verify "did the other fields break it" without re-typing.
-      const effective: ConnectionInput =
-        mode === "edit" && initial && form.password === ""
-          ? { ...form, password: initial.password }
-          : form;
+      // In edit mode the password / token fields are empty by design —
+      // fall back to the existing connection's stored secret for the test
+      // probe so the user can verify "did the other fields break it"
+      // without re-typing.
+      let effective: ConnectionInput = form;
+      if (mode === "edit" && initial) {
+        if (effective.password === "") {
+          effective = { ...effective, password: initial.password };
+        }
+        if ((effective.token ?? "") === "" && initial.token) {
+          effective = { ...effective, token: initial.token };
+        }
+      }
       const result = await ds.testConnectionConfig(effective);
       setTestResult(result);
       if (result.ok) {
@@ -208,17 +228,61 @@ export function ConnectionFormDialog({
               className={inputClass}
             />
           </Field>
-          <Field label="Password" error={errors.password}>
-            <Input
-              type="password"
-              value={form.password}
-              onChange={(e) => update("password", e.target.value)}
-              placeholder={
-                mode === "edit" ? "Leave empty to keep current" : ""
-              }
-              className={inputClass}
-            />
+          <Field label="Auth">
+            <div className="inline-flex h-8 rounded border border-input bg-background p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => update("authMode", "basic")}
+                className={cn(
+                  "px-3 rounded-sm transition",
+                  form.authMode === "basic"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Basic
+              </button>
+              <button
+                type="button"
+                onClick={() => update("authMode", "token")}
+                className={cn(
+                  "px-3 rounded-sm transition",
+                  form.authMode === "token"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Token
+              </button>
+            </div>
           </Field>
+          {form.authMode === "basic" ? (
+            <Field label="Password" error={errors.password}>
+              <Input
+                type="password"
+                value={form.password}
+                onChange={(e) => update("password", e.target.value)}
+                placeholder={
+                  mode === "edit" ? "Leave empty to keep current" : ""
+                }
+                className={inputClass}
+              />
+            </Field>
+          ) : (
+            <Field label="Token" error={errors.token}>
+              <Input
+                type="password"
+                value={form.token ?? ""}
+                onChange={(e) => update("token", e.target.value)}
+                placeholder={
+                  mode === "edit"
+                    ? "Leave empty to keep current"
+                    : "Paste TDengine Cloud token"
+                }
+                className={inputClass}
+              />
+            </Field>
+          )}
         </div>
 
         {testResult && (

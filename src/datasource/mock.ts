@@ -50,14 +50,19 @@ function loadConnectionsFromStorage(): Connection[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const valid = parsed.every(
-      (c): c is Connection =>
+      (c) =>
         typeof c === "object" &&
         c !== null &&
         typeof c.id === "string" &&
         typeof c.name === "string" &&
         typeof c.host === "string",
     );
-    return valid ? (parsed as Connection[]) : [];
+    if (!valid) return [];
+    // Backfill authMode for pre-token-auth localStorage entries.
+    return (parsed as Array<Partial<Connection> & Connection>).map((c) => ({
+      ...c,
+      authMode: c.authMode ?? "basic",
+    }));
   } catch {
     return [];
   }
@@ -118,6 +123,9 @@ export class MockDataSource implements DataSource {
     if (this._connections.some((c) => c.name === name)) {
       throw new Error("Connection name already exists");
     }
+    if (input.authMode === "token" && (input.token ?? "").length === 0) {
+      throw new Error("Token is required when authMode='token'");
+    }
     const created: Connection = {
       id: nanoid(),
       name,
@@ -127,6 +135,8 @@ export class MockDataSource implements DataSource {
       password: input.password,
       color: input.color,
       status: "online",
+      authMode: input.authMode,
+      token: input.token,
     };
     this._connections.push(created);
     this.persist();
@@ -142,14 +152,29 @@ export class MockDataSource implements DataSource {
       throw new Error("Connection name already exists");
     }
     const prev = this._connections[idx]!;
+    // Empty password / token = "keep current"; matches Rust state.rs.
+    const nextPassword =
+      input.password.length === 0 ? prev.password : input.password;
+    const nextToken =
+      input.token === undefined || input.token.length === 0
+        ? prev.token
+        : input.token;
+    if (
+      input.authMode === "token" &&
+      (nextToken === undefined || nextToken.length === 0)
+    ) {
+      throw new Error("Token is required when authMode='token'");
+    }
     this._connections[idx] = {
       ...prev,
       name,
       host: input.host,
       port: input.port,
       user: input.user,
-      password: input.password,
+      password: nextPassword,
       color: input.color,
+      authMode: input.authMode,
+      token: nextToken,
     };
     this.persist();
   }
@@ -170,6 +195,13 @@ export class MockDataSource implements DataSource {
     const host = input.host.trim();
     if (host === "" || input.port < 1 || input.port > 65535) {
       return { ok: false, message: "Invalid host or port" };
+    }
+    if (input.authMode === "token") {
+      const token = (input.token ?? "").trim();
+      if (token.length < 8) {
+        return { ok: false, message: "token too short" };
+      }
+      return { ok: true, message: "TDengine 3.x (mock token mode)" };
     }
     if (isLanHost(host)) {
       if (Math.random() < 0.5) {

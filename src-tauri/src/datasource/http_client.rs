@@ -17,7 +17,7 @@ use serde_json::Value as JsonValue;
 
 use crate::datasource::error::DataSourceError;
 use crate::datasource::types::{
-    Column, Connection, Database, ListTablesOpts, Paged, QueryResult, STable, Table,
+    AuthMode, Column, Connection, Database, ListTablesOpts, Paged, QueryResult, STable, Table,
     TestConnectionResult,
 };
 
@@ -46,8 +46,16 @@ fn endpoint(conn: &Connection, db: Option<&str>) -> String {
 }
 
 fn auth_header(conn: &Connection) -> String {
-    let credentials = format!("{}:{}", conn.user, conn.password);
-    format!("Basic {}", general_purpose::STANDARD.encode(credentials))
+    match conn.auth_mode {
+        AuthMode::Basic => {
+            let credentials = format!("{}:{}", conn.user, conn.password);
+            format!("Basic {}", general_purpose::STANDARD.encode(credentials))
+        }
+        AuthMode::Token => {
+            let token = conn.token.as_deref().unwrap_or("");
+            format!("Taosd {}", token)
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -91,6 +91,8 @@ pub async fn test_connection_config(
         password: input.password,
         color: input.color,
         status: crate::datasource::types::ConnectionStatus::Online,
+        auth_mode: input.auth_mode,
+        token: input.token,
     };
     Ok(http_client::test_connection(&conn).await)
 }

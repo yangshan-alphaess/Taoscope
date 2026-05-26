@@ -52,8 +52,36 @@ CREATE TABLE IF NOT EXISTS meta (
 INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '1');
 "#;
 
+const SCHEMA_V2_MIGRATION: &str = r#"
+ALTER TABLE connections ADD COLUMN auth_mode TEXT NOT NULL DEFAULT 'basic' CHECK (auth_mode IN ('basic','token'));
+ALTER TABLE connections ADD COLUMN token TEXT;
+"#;
+
 pub fn migrate(conn: &Connection) -> Result<(), DataSourceError> {
-    conn.execute_batch(SCHEMA_V1).map_err(map_err)
+    conn.execute_batch(SCHEMA_V1).map_err(map_err)?;
+
+    let current: String = conn
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'schema_version'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(map_err)?;
+
+    let mut version: u32 = current.parse().unwrap_or(1);
+
+    if version < 2 {
+        conn.execute_batch(SCHEMA_V2_MIGRATION).map_err(map_err)?;
+        version = 2;
+    }
+
+    conn.execute(
+        "UPDATE meta SET value = ?1 WHERE key = 'schema_version'",
+        rusqlite::params![version.to_string()],
+    )
+    .map_err(map_err)?;
+
+    Ok(())
 }
 
 pub fn seed_if_empty(conn: &Connection) -> Result<(), DataSourceError> {

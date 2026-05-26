@@ -17,7 +17,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::datasource::db;
 use crate::datasource::error::DataSourceError;
 use crate::datasource::types::{
-    Connection as DsConnection, ConnectionInput, ConnectionStatus, Console as DsConsole,
+    AuthMode, Connection as DsConnection, ConnectionInput, ConnectionStatus, Console as DsConsole,
     CreateConsoleInput, HistoryEntry, QueryResult,
 };
 
@@ -46,7 +46,7 @@ impl Store {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT id, name, host, port, user, password, color, status \
+                "SELECT id, name, host, port, user, password, color, status, auth_mode, token \
                  FROM connections ORDER BY rowid",
             )
             .map_err(db::map_err)?;
@@ -63,7 +63,7 @@ impl Store {
     pub fn get_connection(&self, id: &str) -> Result<DsConnection, DataSourceError> {
         self.conn
             .query_row(
-                "SELECT id, name, host, port, user, password, color, status \
+                "SELECT id, name, host, port, user, password, color, status, auth_mode, token \
                  FROM connections WHERE id = ?1",
                 params![id],
                 row_to_connection,
@@ -80,10 +80,19 @@ impl Store {
         let name = input.name.trim().to_string();
         let id = nanoid::nanoid!();
 
+        if matches!(input.auth_mode, AuthMode::Token)
+            && input.token.as_deref().unwrap_or("").is_empty()
+        {
+            return Err(DataSourceError::Other(
+                "Token is required when authMode='token'".into(),
+            ));
+        }
+
         self.conn
             .execute(
-                "INSERT INTO connections (id, name, host, port, user, password, color, status) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO connections \
+                 (id, name, host, port, user, password, color, status, auth_mode, token) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     id,
                     name,
@@ -93,6 +102,8 @@ impl Store {
                     input.password,
                     input.color,
                     status_str(&ConnectionStatus::Online),
+                    auth_mode_str(input.auth_mode),
+                    input.token,
                 ],
             )
             .map_err(|e| match db::map_err(e) {
@@ -112,6 +123,8 @@ impl Store {
             password: input.password,
             color: input.color,
             status: ConnectionStatus::Online,
+            auth_mode: input.auth_mode,
+            token: input.token,
         })
     }
 
@@ -138,32 +151,74 @@ impl Store {
 
         let name = input.name.trim().to_string();
 
-        // Empty password in update means "keep current" — the edit dialog
-        // doesn't display the actual password, so unless the user typed a
-        // new value we must not overwrite the stored one.
-        let affected = if input.password.is_empty() {
-            self.conn.execute(
-                "UPDATE connections SET name = ?1, host = ?2, port = ?3, user = ?4, \
-                 color = ?5 WHERE id = ?6",
-                params![name, input.host, input.port, input.user, input.color, id],
-            )
-        } else {
-            self.conn.execute(
-                "UPDATE connections SET name = ?1, host = ?2, port = ?3, user = ?4, \
-                 password = ?5, color = ?6 WHERE id = ?7",
-                params![
-                    name,
-                    input.host,
-                    input.port,
-                    input.user,
-                    input.password,
-                    input.color,
-                    id,
-                ],
-            )
-        };
+        // Empty password / token in update means "keep current" — the edit
+        // dialog never echoes secrets back, so absence of input must not
+        // overwrite the stored value. Build the SET clause dynamically so
+        // we only touch the secret column the user actually typed into.
+        let mut sets: Vec<&str> = vec![
+            "name = ?",
+            "host = ?",
+            "port = ?",
+            "user = ?",
+            "color = ?",
+            "auth_mode = ?",
+        ];
+        let mut values: Vec<Box<dyn rusqlite::ToSql>> = vec![
+            Box::new(name.clone()),
+            Box::new(input.host.clone()),
+            Box::new(input.port),
+            Box::new(input.user.clone()),
+            Box::new(input.color.clone()),
+            Box::new(auth_mode_str(input.auth_mode)),
+        ];
 
-        affected
+        let password_provided = !input.password.is_empty();
+        if password_provided {
+            sets.push("password = ?");
+            values.push(Box::new(input.password.clone()));
+        }
+
+        let token_provided = input
+            .token
+            .as_deref()
+            .map(|t| !t.is_empty())
+            .unwrap_or(false);
+        if token_provided {
+            sets.push("token = ?");
+            values.push(Box::new(input.token.clone()));
+        }
+
+        // When switching INTO token mode, the user must have provided a
+        // token at some point (either now or already stored). Verify.
+        if matches!(input.auth_mode, AuthMode::Token) && !token_provided {
+            let existing_token: Option<String> = self
+                .conn
+                .query_row(
+                    "SELECT token FROM connections WHERE id = ?1",
+                    params![id],
+                    |r| r.get::<_, Option<String>>(0),
+                )
+                .optional()
+                .map_err(db::map_err)?
+                .flatten();
+            if existing_token.as_deref().unwrap_or("").is_empty() {
+                return Err(DataSourceError::Other(
+                    "Token is required when authMode='token'".into(),
+                ));
+            }
+        }
+
+        let sql = format!(
+            "UPDATE connections SET {} WHERE id = ?",
+            sets.join(", ")
+        );
+        let id_box: Box<dyn rusqlite::ToSql> = Box::new(id.to_string());
+        values.push(id_box);
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            values.iter().map(|b| b.as_ref()).collect();
+
+        self.conn
+            .execute(&sql, params_refs.as_slice())
             .map_err(|e| match db::map_err(e) {
                 DataSourceError::AlreadyExists(_) => DataSourceError::AlreadyExists(format!(
                     "Connection name '{}' already exists",
@@ -459,6 +514,11 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> 
         "online" => ConnectionStatus::Online,
         _ => ConnectionStatus::Offline,
     };
+    let auth_mode_str: String = row.get("auth_mode")?;
+    let auth_mode = match auth_mode_str.as_str() {
+        "token" => AuthMode::Token,
+        _ => AuthMode::Basic,
+    };
     Ok(DsConnection {
         id: row.get("id")?,
         name: row.get("name")?,
@@ -468,6 +528,8 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> 
         password: row.get("password")?,
         color: row.get("color")?,
         status,
+        auth_mode,
+        token: row.get("token")?,
     })
 }
 
@@ -485,5 +547,12 @@ fn status_str(status: &ConnectionStatus) -> &'static str {
     match status {
         ConnectionStatus::Online => "online",
         ConnectionStatus::Offline => "offline",
+    }
+}
+
+fn auth_mode_str(mode: AuthMode) -> &'static str {
+    match mode {
+        AuthMode::Basic => "basic",
+        AuthMode::Token => "token",
     }
 }

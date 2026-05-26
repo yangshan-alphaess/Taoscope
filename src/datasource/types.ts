@@ -35,6 +35,8 @@ export interface Column {
   isPrimaryTs?: boolean;
 }
 
+export type AuthMode = "basic" | "token";
+
 export interface Connection {
   id: string;
   name: string;
@@ -45,6 +47,9 @@ export interface Connection {
   /** Optional color label for visual disambiguation between connections. */
   color?: string;
   status: "online" | "offline";
+  authMode: AuthMode;
+  /** Bearer-style token used when authMode === 'token'. */
+  token?: string;
 }
 
 export interface ConnectionInput {
@@ -54,6 +59,8 @@ export interface ConnectionInput {
   user: string;
   password: string;
   color?: string;
+  authMode: AuthMode;
+  token?: string;
 }
 
 export interface Database {
