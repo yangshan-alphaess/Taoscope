@@ -1,8 +1,14 @@
 # Taoscope
 
+**English** · [中文](README.zh-CN.md)
+
 A fast, keyboard-friendly desktop manager for **TDengine 3.x**.
 
 Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connects to TDengine over the REST API and gives you the productivity surfaces you'd expect from a modern SQL workbench, tuned for time-series specifics like super tables, child tables, and tags.
+
+<p align="center">
+  <img src="docs/images/ui.png" alt="Taoscope main window" width="900">
+</p>
 
 ## Features
 
@@ -127,7 +133,7 @@ git push --follow-tags origin main   # main + tag in one shot → CI fires
 
 ## Status
 
-- **0.1.x**: Phase 1 (mock data source, UI shell) + Phase 2 (Tauri backend, real TDengine queries, persistence, vault) closed. Auto-update channel live.
+- **1.0.0**: first stable cut. Phase 1 (mock data source, UI shell) + Phase 2 (Tauri backend, real TDengine queries, persistence, OS-keychain vault) closed; auto-update channel live.
 - Code-signing certificates are **not yet** wired up — macOS users right-click → Open the first time; Windows users dismiss SmartScreen. Both `docs/RELEASE.md` and the in-app updater handle the subsequent upgrade path cleanly.
 
 See [FEATURES.md](FEATURES.md) for the long-tail enhancement backlog (TLS, query cancel, WS protocol, etc.).
