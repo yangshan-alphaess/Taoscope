@@ -102,6 +102,7 @@ pub async fn test_connection_config(
         protocol: input.protocol,
         allow_invalid_certs: input.allow_invalid_certs,
         transport: input.transport,
+        timeout_ms: input.timeout_ms,
     };
     Ok(transport::test_connection(&conn).await)
 }

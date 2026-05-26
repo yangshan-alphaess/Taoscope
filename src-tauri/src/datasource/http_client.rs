@@ -27,6 +27,10 @@ use crate::datasource::types::{
     TestConnectionResult,
 };
 
+/// Default per-request timeout for HTTP REST calls; `Connection.timeout_ms`
+/// overrides per call.
+pub const DEFAULT_TIMEOUT_MS: u32 = 30_000;
+
 static STRICT_CLIENT: OnceLock<Client> = OnceLock::new();
 static LAX_CLIENT: OnceLock<Client> = OnceLock::new();
 
@@ -92,14 +96,22 @@ async fn execute_sql(
     db: Option<&str>,
     sql: &str,
 ) -> Result<TdResponse, DataSourceError> {
+    let timeout_ms = conn.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS);
     let resp = http_client(conn.allow_invalid_certs)
         .post(endpoint(conn, db))
         .header("Authorization", auth_header(conn))
         .header("Content-Type", "text/plain")
+        .timeout(Duration::from_millis(timeout_ms as u64))
         .body(sql.to_string())
         .send()
         .await
-        .map_err(|e| DataSourceError::Network(e.to_string()))?;
+        .map_err(|e| {
+            if e.is_timeout() {
+                DataSourceError::Other(format!("Query timeout after {}ms", timeout_ms))
+            } else {
+                DataSourceError::Network(e.to_string())
+            }
+        })?;
 
     let status = resp.status();
     if status == reqwest::StatusCode::UNAUTHORIZED {

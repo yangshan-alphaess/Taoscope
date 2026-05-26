@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use serde_json::Value as JsonValue;
 use taos::taos_query::common::Value as TaosValue;
@@ -134,7 +134,7 @@ struct ResultRows {
     row_count: u32,
 }
 
-async fn run(
+async fn run_inner(
     taos: &taos::Taos,
     db: Option<&str>,
     sql: &str,
@@ -179,6 +179,31 @@ async fn run(
     })
 }
 
+async fn run(
+    taos: &taos::Taos,
+    timeout_ms: u32,
+    db: Option<&str>,
+    sql: &str,
+) -> Result<ResultRows, DataSourceError> {
+    match tokio::time::timeout(
+        Duration::from_millis(timeout_ms as u64),
+        run_inner(taos, db, sql),
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(_) => Err(DataSourceError::Other(format!(
+            "Query timeout after {}ms",
+            timeout_ms
+        ))),
+    }
+}
+
+fn effective_timeout(conn: &Connection) -> u32 {
+    conn.timeout_ms
+        .unwrap_or(crate::datasource::http_client::DEFAULT_TIMEOUT_MS)
+}
+
 // ── Public methods ──────────────────────────────────────────────────────
 
 pub async fn test_connection(conn: &Connection) -> TestConnectionResult {
@@ -202,7 +227,8 @@ pub async fn test_connection(conn: &Connection) -> TestConnectionResult {
 
 pub async fn list_databases(conn: &Connection) -> Result<Vec<Database>, DataSourceError> {
     let taos = get_or_connect(conn).await?;
-    let result = run(&taos, None, SQL_SHOW_DATABASES).await?;
+    let timeout_ms = effective_timeout(conn);
+    let result = run(&taos, timeout_ms, None, SQL_SHOW_DATABASES).await?;
     let name_idx = column_index(&result.columns, "name");
     let retention_idx = column_index(&result.columns, "retention")
         .or_else(|| column_index(&result.columns, "retentions"));
@@ -238,7 +264,8 @@ pub async fn list_stables(
     db: &str,
 ) -> Result<Vec<STable>, DataSourceError> {
     let taos = get_or_connect(conn).await?;
-    let result = run(&taos, Some(db), SQL_SHOW_STABLES).await?;
+    let timeout_ms = effective_timeout(conn);
+    let result = run(&taos, timeout_ms, Some(db), SQL_SHOW_STABLES).await?;
     let name_idx = column_index(&result.columns, "stable_name")
         .or_else(|| column_index(&result.columns, "name"));
     let Some(name_idx) = name_idx else {
@@ -253,7 +280,7 @@ pub async fn list_stables(
 
     let count_sql = build_count_stables_sql(db);
     let mut count_map: HashMap<String, u32> = HashMap::new();
-    if let Ok(count_resp) = run(&taos, None, &count_sql).await {
+    if let Ok(count_resp) = run(&taos, timeout_ms, None, &count_sql).await {
         let cn_idx = column_index(&count_resp.columns, "stable_name");
         let cc_idx = column_index(&count_resp.columns, "c")
             .or_else(|| column_index(&count_resp.columns, "count(*)"));
@@ -299,11 +326,12 @@ pub async fn list_tables(
     }
 
     let taos = get_or_connect(conn).await?;
+    let timeout_ms = effective_timeout(conn);
 
     if let Some(stable) = &opts.stable {
         let items_sql =
             build_list_child_tables_sql(db, stable, opts.search.as_deref(), page_size, offset);
-        let items_resp = run(&taos, None, &items_sql).await?;
+        let items_resp = run(&taos, timeout_ms, None, &items_sql).await?;
         let mut items: Vec<Table> = Vec::with_capacity(items_resp.rows.len());
         for row in &items_resp.rows {
             if let Some(name) = row.first().and_then(cell_to_string) {
@@ -316,7 +344,7 @@ pub async fn list_tables(
         }
         let count_sql =
             build_count_child_tables_sql(db, stable, opts.search.as_deref());
-        let total = match run(&taos, None, &count_sql).await {
+        let total = match run(&taos, timeout_ms, None, &count_sql).await {
             Ok(resp) => resp
                 .rows
                 .first()
@@ -335,7 +363,7 @@ pub async fn list_tables(
 
     let items_sql =
         build_list_normal_tables_sql(db, opts.search.as_deref(), page_size, offset);
-    let items_resp = run(&taos, None, &items_sql).await?;
+    let items_resp = run(&taos, timeout_ms, None, &items_sql).await?;
     let mut items: Vec<Table> = Vec::with_capacity(items_resp.rows.len());
     for row in &items_resp.rows {
         if let Some(name) = row.first().and_then(cell_to_string) {
@@ -348,7 +376,7 @@ pub async fn list_tables(
     }
 
     let count_sql = build_count_normal_tables_sql(db, opts.search.as_deref());
-    let total = match run(&taos, None, &count_sql).await {
+    let total = match run(&taos, timeout_ms, None, &count_sql).await {
         Ok(resp) => resp
             .rows
             .first()
@@ -371,8 +399,9 @@ pub async fn describe_table(
     table: &str,
 ) -> Result<Vec<Column>, DataSourceError> {
     let taos = get_or_connect(conn).await?;
+    let timeout_ms = effective_timeout(conn);
     let sql = build_describe_sql(db, table);
-    let result = run(&taos, None, &sql).await?;
+    let result = run(&taos, timeout_ms, None, &sql).await?;
 
     let field_idx = column_index(&result.columns, "field").unwrap_or(0);
     let type_idx = column_index(&result.columns, "type").unwrap_or(1);
@@ -420,8 +449,9 @@ pub async fn run_sql(
     sql: &str,
 ) -> Result<QueryResult, DataSourceError> {
     let taos = get_or_connect(conn).await?;
+    let timeout_ms = effective_timeout(conn);
     let start = Instant::now();
-    let result = run(&taos, db, sql).await?;
+    let result = run(&taos, timeout_ms, db, sql).await?;
     let elapsed_ms = start.elapsed().as_millis() as u32;
     Ok(QueryResult {
         columns: result.columns,

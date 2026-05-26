@@ -47,7 +47,7 @@ impl Store {
             .conn
             .prepare(
                 "SELECT id, name, host, port, user, password, color, status, auth_mode, token, \
-                 protocol, allow_invalid_certs, transport \
+                 protocol, allow_invalid_certs, transport, timeout_ms \
                  FROM connections ORDER BY rowid",
             )
             .map_err(db::map_err)?;
@@ -65,7 +65,7 @@ impl Store {
         self.conn
             .query_row(
                 "SELECT id, name, host, port, user, password, color, status, auth_mode, token, \
-                 protocol, allow_invalid_certs, transport \
+                 protocol, allow_invalid_certs, transport, timeout_ms \
                  FROM connections WHERE id = ?1",
                 params![id],
                 row_to_connection,
@@ -94,8 +94,8 @@ impl Store {
             .execute(
                 "INSERT INTO connections \
                  (id, name, host, port, user, password, color, status, auth_mode, token, \
-                  protocol, allow_invalid_certs, transport) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                  protocol, allow_invalid_certs, transport, timeout_ms) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 params![
                     id,
                     name,
@@ -110,6 +110,7 @@ impl Store {
                     input.protocol.as_str(),
                     input.allow_invalid_certs as i64,
                     input.transport.as_str(),
+                    input.timeout_ms.map(|v| v as i64),
                 ],
             )
             .map_err(|e| match db::map_err(e) {
@@ -134,6 +135,7 @@ impl Store {
             protocol: input.protocol,
             allow_invalid_certs: input.allow_invalid_certs,
             transport: input.transport,
+            timeout_ms: input.timeout_ms,
         })
     }
 
@@ -174,6 +176,7 @@ impl Store {
             "protocol = ?",
             "allow_invalid_certs = ?",
             "transport = ?",
+            "timeout_ms = ?",
         ];
         let mut values: Vec<Box<dyn rusqlite::ToSql>> = vec![
             Box::new(name.clone()),
@@ -185,6 +188,7 @@ impl Store {
             Box::new(input.protocol.as_str()),
             Box::new(input.allow_invalid_certs as i64),
             Box::new(input.transport.as_str()),
+            Box::new(input.timeout_ms.map(|v| v as i64)),
         ];
 
         let password_provided = !input.password.is_empty();
@@ -545,6 +549,7 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> 
         "ws" => Transport::Ws,
         _ => Transport::Http,
     };
+    let timeout_ms: Option<i64> = row.get("timeout_ms")?;
     Ok(DsConnection {
         id: row.get("id")?,
         name: row.get("name")?,
@@ -559,6 +564,7 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> 
         protocol,
         allow_invalid_certs: allow_invalid_certs != 0,
         transport,
+        timeout_ms: timeout_ms.map(|v| v as u32),
     })
 }
 

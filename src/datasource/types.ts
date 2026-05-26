@@ -58,6 +58,8 @@ export interface Connection {
   /** Skip TLS certificate validation (only meaningful for https). */
   allowInvalidCerts?: boolean;
   transport: Transport;
+  /** Total per-request timeout in milliseconds; undefined = 30s default. */
+  timeoutMs?: number;
 }
 
 export interface ConnectionInput {
@@ -72,6 +74,8 @@ export interface ConnectionInput {
   protocol: Protocol;
   allowInvalidCerts?: boolean;
   transport: Transport;
+  /** Total per-request timeout in milliseconds; undefined = 30s default. */
+  timeoutMs?: number;
 }
 
 export interface Database {

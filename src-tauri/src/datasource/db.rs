@@ -66,6 +66,10 @@ const SCHEMA_V4_MIGRATION: &str = r#"
 ALTER TABLE connections ADD COLUMN transport TEXT NOT NULL DEFAULT 'http' CHECK (transport IN ('http','ws'));
 "#;
 
+const SCHEMA_V5_MIGRATION: &str = r#"
+ALTER TABLE connections ADD COLUMN timeout_ms INTEGER;
+"#;
+
 pub fn migrate(conn: &Connection) -> Result<(), DataSourceError> {
     conn.execute_batch(SCHEMA_V1).map_err(map_err)?;
 
@@ -92,6 +96,11 @@ pub fn migrate(conn: &Connection) -> Result<(), DataSourceError> {
     if version < 4 {
         conn.execute_batch(SCHEMA_V4_MIGRATION).map_err(map_err)?;
         version = 4;
+    }
+
+    if version < 5 {
+        conn.execute_batch(SCHEMA_V5_MIGRATION).map_err(map_err)?;
+        version = 5;
     }
 
     conn.execute(

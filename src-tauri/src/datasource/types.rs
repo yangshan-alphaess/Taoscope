@@ -86,6 +86,10 @@ pub struct Connection {
     pub allow_invalid_certs: bool,
     #[serde(default)]
     pub transport: Transport,
+    /// Total per-request timeout in milliseconds. `None` => use
+    /// `DEFAULT_TIMEOUT_MS` (30_000).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub timeout_ms: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,6 +112,8 @@ pub struct ConnectionInput {
     pub allow_invalid_certs: bool,
     #[serde(default)]
     pub transport: Transport,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub timeout_ms: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -64,6 +64,7 @@ function loadConnectionsFromStorage(): Connection[] {
       authMode: c.authMode ?? "basic",
       protocol: c.protocol ?? "http",
       transport: c.transport ?? "http",
+      timeoutMs: c.timeoutMs,
     }));
   } catch {
     return [];
@@ -142,6 +143,7 @@ export class MockDataSource implements DataSource {
       protocol: input.protocol,
       allowInvalidCerts: input.allowInvalidCerts,
       transport: input.transport,
+      timeoutMs: input.timeoutMs,
     };
     this._connections.push(created);
     this.persist();
@@ -183,6 +185,7 @@ export class MockDataSource implements DataSource {
       protocol: input.protocol,
       allowInvalidCerts: input.allowInvalidCerts,
       transport: input.transport,
+      timeoutMs: input.timeoutMs,
     };
     this.persist();
   }

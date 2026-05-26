@@ -32,6 +32,8 @@ interface ConnectionFormDialogProps {
   onSaved?: (conn: Connection) => void;
 }
 
+const DEFAULT_TIMEOUT_SEC = 30;
+
 const DEFAULT_FORM: ConnectionInput = {
   name: "",
   host: "",
@@ -110,6 +112,12 @@ function validate(
       errors.token = "Token is required";
     }
   }
+  if (form.timeoutMs !== undefined) {
+    const sec = form.timeoutMs / 1000;
+    if (!Number.isInteger(sec) || sec < 1 || sec > 600) {
+      errors.timeoutMs = "Timeout must be 1–600 seconds";
+    }
+  }
   return errors;
 }
 
@@ -148,6 +156,7 @@ export function ConnectionFormDialog({
         protocol: initial.protocol ?? "http",
         allowInvalidCerts: initial.allowInvalidCerts ?? false,
         transport: initial.transport ?? "http",
+        timeoutMs: initial.timeoutMs,
       });
     } else {
       setForm(DEFAULT_FORM);
@@ -401,6 +410,29 @@ export function ConnectionFormDialog({
               />
             </Field>
           )}
+          <Field label="Timeout (seconds)" error={errors.timeoutMs}>
+            <Input
+              type="number"
+              min={1}
+              max={600}
+              value={
+                form.timeoutMs === undefined ? "" : Math.round(form.timeoutMs / 1000)
+              }
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                if (raw === "") {
+                  update("timeoutMs", undefined);
+                  return;
+                }
+                const sec = Number.parseInt(raw, 10);
+                if (Number.isFinite(sec)) {
+                  update("timeoutMs", sec * 1000);
+                }
+              }}
+              placeholder={String(DEFAULT_TIMEOUT_SEC)}
+              className={inputClass}
+            />
+          </Field>
         </div>
 
         {testResult && (

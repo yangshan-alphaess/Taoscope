@@ -13,7 +13,29 @@ function EmptyHint({ children }: { children: ReactNode }) {
   );
 }
 
+const TIMEOUT_ERROR_PREFIX = "Query timeout after ";
+
+function parseTimeoutSeconds(message: string): number | null {
+  if (!message.startsWith(TIMEOUT_ERROR_PREFIX)) return null;
+  const m = /Query timeout after (\d+)ms/.exec(message);
+  if (!m || !m[1]) return null;
+  const ms = Number.parseInt(m[1], 10);
+  return Number.isFinite(ms) ? Math.round(ms / 1000) : null;
+}
+
 function FullScreenError({ message }: { message: string }) {
+  const timeoutSec = parseTimeoutSeconds(message);
+  if (timeoutSec !== null) {
+    return (
+      <div className="flex h-full items-center justify-center px-4">
+        <p className="text-amber-700 dark:text-amber-300 text-xs">
+          <span className="mr-1">⏱</span>
+          Query timed out after {timeoutSec}s. Adjust the timeout in
+          connection settings.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="flex h-full items-center justify-center px-4">
       <p className="text-destructive text-xs">
