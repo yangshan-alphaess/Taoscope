@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Concept J — Hex-T constellation (fillet + hub gap)
+  6 个 T 摆在 flat-top 六边形的 6 条边中点上：
+   · 每个 T 是一个填充 path，横杠与辐条相交处用 40px 内凹圆弧
+     (concave fillet) 做柔和过渡；
+   · 辐条不触碰 hub，留出约 13px 呼吸空隙，hub 仍是空心圆。
+  画法：先在画布原点定义一个朝下的 canonical T (id="t")，
+  再用 6 次 translate+rotate 放到六边形的 6 条边上。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#0A1412"/>
+
+  <defs>
+    <!--
+      Canonical T: 横杠沿 ±x (半长 130)，辐条沿 +y (长 150)，
+      stroke 半宽 28，bar/spoke 端点用半径 28 的半圆 cap，
+      横杠下沿与辐条侧边以半径 40 的内凹圆弧过渡。
+    -->
+    <path id="t" d="
+      M -130,-28
+      L  130,-28
+      A 28,28 0 0,1 130,28
+      L  68,28
+      A 40,40 0 0,0 28,68
+      L  28,150
+      A 28,28 0 0,1 -28,150
+      L -28,68
+      A 40,40 0 0,0 -68,28
+      L -130,28
+      A 28,28 0 0,1 -130,-28
+      Z"/>
+  </defs>
+
+  <g fill="#06D49A">
+    <!-- 6 个 T：translate 到边中点，rotate 让辐条指向画布中心 -->
+    <use href="#t" transform="translate(512,183)"/>             <!-- 正上 -->
+    <use href="#t" transform="translate(797,348) rotate(60)"/>  <!-- 右上 -->
+    <use href="#t" transform="translate(797,676) rotate(120)"/> <!-- 右下 -->
+    <use href="#t" transform="translate(512,841) rotate(180)"/> <!-- 正下 -->
+    <use href="#t" transform="translate(227,676) rotate(-120)"/><!-- 左下 -->
+    <use href="#t" transform="translate(227,348) rotate(-60)"/> <!-- 左上 -->
+
+    <!-- 中心空心 hub（独立，不与辐条相连） -->
+    <circle cx="512" cy="512" r="100"
+            fill="none" stroke="#06D49A" stroke-width="56"/>
+  </g>
+</svg>
