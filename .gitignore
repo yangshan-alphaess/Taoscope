@@ -42,3 +42,6 @@ package-lock.json
 yarn.lock
 
 /openspec
+
+taoscope.key
+taoscope.key.pub
