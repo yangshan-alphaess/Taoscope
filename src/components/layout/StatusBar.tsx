@@ -1,6 +1,8 @@
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
+import { LocaleToggle } from "@/components/layout/LocaleToggle";
 import { useUpdater } from "@/lib/updater";
 import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
@@ -12,6 +14,7 @@ const APP_VERSION =
   typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
 
 export function StatusBar() {
+  const { t } = useTranslation("common");
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const runtime = useAppState((s) =>
     activeConsoleId ? s.consoleRuntime[activeConsoleId] : undefined,
@@ -23,16 +26,16 @@ export function StatusBar() {
   let leftLabel: string;
   switch (status) {
     case "idle":
-      leftLabel = "ready";
+      leftLabel = t("status.ready");
       break;
     case "running":
-      leftLabel = "running…";
+      leftLabel = t("status.running");
       break;
     case "ok":
-      leftLabel = "OK";
+      leftLabel = t("status.ok");
       break;
     case "error":
-      leftLabel = `ERROR: ${runtime?.execError ?? "unknown"}`;
+      leftLabel = `${t("status.error")}: ${runtime?.execError ?? "unknown"}`;
       break;
   }
 
@@ -56,12 +59,20 @@ export function StatusBar() {
         <span className="truncate">{leftLabel}</span>
       </div>
       <div className="font-mono">
-        {showStats ? `${runtime!.lastResult!.rowCount} rows` : "— rows"}
+        {showStats
+          ? `${runtime!.lastResult!.rowCount} ${t("unit.rows")}`
+          : `— ${t("unit.rows")}`}
       </div>
       <div className="flex items-center gap-2 font-mono">
-        <span>{showStats ? `${runtime!.lastResult!.elapsedMs} ms` : "— ms"}</span>
+        <span>
+          {showStats
+            ? `${runtime!.lastResult!.elapsedMs} ${t("unit.ms")}`
+            : `— ${t("unit.ms")}`}
+        </span>
         <span className="text-muted-foreground/40">·</span>
         <UpdaterStatus />
+        <span className="text-muted-foreground/40">·</span>
+        <LocaleToggle />
       </div>
     </footer>
   );

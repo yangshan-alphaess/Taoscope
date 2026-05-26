@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 import {
@@ -25,6 +26,7 @@ interface ConfirmState {
 const INITIAL: ConfirmState = { open: false, options: null, resolve: null };
 
 export function ConfirmRoot() {
+  const { t } = useTranslation("common");
   const [state, setState] = useState<ConfirmState>(INITIAL);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -68,7 +70,7 @@ export function ConfirmRoot() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => close(false)}>
-                {opts.cancelLabel ?? "Cancel"}
+                {opts.cancelLabel ?? t("button.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => close(true)}
@@ -77,7 +79,7 @@ export function ConfirmRoot() {
                     "bg-destructive text-destructive-foreground hover:bg-destructive/90",
                 )}
               >
-                {opts.confirmLabel ?? "Confirm"}
+                {opts.confirmLabel ?? t("button.confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </>

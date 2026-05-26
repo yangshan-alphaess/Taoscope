@@ -1,0 +1,28 @@
+{
+  "button": {
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "close": "关闭",
+    "save": "保存",
+    "retry": "重试",
+    "test": "测试"
+  },
+  "status": {
+    "ready": "就绪",
+    "running": "执行中…",
+    "ok": "成功",
+    "error": "错误",
+    "loading": "加载中…"
+  },
+  "unit": {
+    "rows": "行",
+    "ms": "毫秒",
+    "all-rows": "全部行",
+    "capped-at": "截断至 {{cap}} 行"
+  },
+  "locale-toggle": {
+    "tooltip-to-zh": "切换到中文",
+    "tooltip-to-en": "Switch to English"
+  }
+}

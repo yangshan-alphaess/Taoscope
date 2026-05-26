@@ -1,0 +1,28 @@
+{
+  "button": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "close": "Close",
+    "save": "Save",
+    "retry": "Retry",
+    "test": "Test"
+  },
+  "status": {
+    "ready": "ready",
+    "running": "running…",
+    "ok": "OK",
+    "error": "ERROR",
+    "loading": "Loading…"
+  },
+  "unit": {
+    "rows": "rows",
+    "ms": "ms",
+    "all-rows": "all rows",
+    "capped-at": "capped at {{cap}}"
+  },
+  "locale-toggle": {
+    "tooltip-to-zh": "切换到中文",
+    "tooltip-to-en": "Switch to English"
+  }
+}
