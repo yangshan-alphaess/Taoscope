@@ -45,3 +45,7 @@ yarn.lock
 
 taoscope.key
 taoscope.key.pub
+
+# Local icon design scratch — the picked source lives at
+# src-tauri/icons/source.svg, the rest is just iteration history.
+/icon-drafts/
