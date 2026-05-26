@@ -24,13 +24,7 @@ function FullScreenError({ message }: { message: string }) {
   );
 }
 
-function GridWithBanners({
-  result,
-  error,
-}: {
-  result: QueryResult;
-  error?: string | null;
-}) {
+function GridWithBanners({ result }: { result: QueryResult }) {
   const [filterQuery, setFilterQuery] = useState("");
   useEffect(() => {
     setFilterQuery("");
@@ -50,14 +44,6 @@ function GridWithBanners({
             Result was capped at 1000 rows. Add a{" "}
             <code className="font-mono">LIMIT</code> clause to see specific
             data.
-          </span>
-        </div>
-      )}
-      {error && (
-        <div className="border-destructive/30 bg-destructive/10 text-destructive flex shrink-0 items-center gap-1.5 border-b px-3 py-1 text-xs">
-          <span>✕</span>
-          <span>
-            Last run failed: <span className="font-mono">{error}</span>
           </span>
         </div>
       )}
@@ -88,17 +74,17 @@ export function ResultPanel() {
       body = <EmptyHint>Running query…</EmptyHint>;
     } else if (execStatus === "running" && lastResult) {
       body = <GridWithBanners result={lastResult} />;
-    } else if (
-      execStatus === "ok" &&
-      lastResult &&
-      lastResult.rows.length === 0
-    ) {
-      body = <EmptyHint>Query succeeded with 0 rows.</EmptyHint>;
     } else if (execStatus === "ok" && lastResult) {
+      // Always render the grid on success — even with 0 rows, the column
+      // headers tell the user what the query *would* have returned, which is
+      // useful schema info. ResultGrid surfaces a "No rows" placeholder when
+      // rows.length === 0.
       body = <GridWithBanners result={lastResult} />;
-    } else if (execStatus === "error" && lastResult) {
-      body = <GridWithBanners result={lastResult} error={execError} />;
-    } else if (execStatus === "error" && !lastResult) {
+    } else if (execStatus === "error") {
+      // Don't keep showing the previous query's grid behind a red banner —
+      // that misleads the user into thinking the failed query "returned" those
+      // columns. Show the error full-screen, regardless of whether a stale
+      // lastResult is still around.
       body = <FullScreenError message={execError ?? "Unknown error"} />;
     } else {
       body = <EmptyHint>—</EmptyHint>;

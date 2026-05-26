@@ -322,11 +322,24 @@ export function ResultGrid({
         <tbody
           style={{
             display: "block",
-            height: rowVirtualizer.getTotalSize(),
+            height:
+              rows.length === 0 ? undefined : rowVirtualizer.getTotalSize(),
             position: "relative",
             width: totalWidth,
           }}
         >
+          {rows.length === 0 && (
+            <tr style={{ display: "flex", width: totalWidth }}>
+              <td
+                className="text-muted-foreground/70 px-3 py-2 text-xs italic"
+                style={{ width: totalWidth }}
+              >
+                {result.rows.length === 0
+                  ? "No rows."
+                  : "No rows match the current filter."}
+              </td>
+            </tr>
+          )}
           {rowVirtualizer.getVirtualItems().map((vRow) => {
             const row = rows[vRow.index];
             if (!row) return null;

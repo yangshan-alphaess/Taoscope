@@ -67,10 +67,49 @@ export const taoscopeEditorTheme = EditorView.theme(
       color: "hsl(var(--popover-foreground))",
       border: "1px solid hsl(var(--border))",
       borderRadius: "6px",
+      fontFamily: "var(--font-mono, ui-monospace, monospace)",
+      fontSize: "13px",
+    },
+    ".cm-tooltip-autocomplete > ul": {
+      fontFamily: "inherit",
+      fontSize: "inherit",
+      maxHeight: "16em",
+    },
+    ".cm-tooltip-autocomplete > ul > li": {
+      padding: "2px 8px",
+      lineHeight: "1.5",
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
     },
     ".cm-tooltip-autocomplete ul li[aria-selected]": {
       backgroundColor: "hsl(var(--muted))",
       color: "hsl(var(--foreground))",
+    },
+    // The user asked for an icon-free, monospace popup matching the editor's
+    // body text; the type-of-completion glyphs (key, class, etc.) carry no
+    // extra info that the right-aligned detail column doesn't already convey.
+    ".cm-completionIcon": {
+      display: "none",
+    },
+    ".cm-completionLabel": {
+      flex: "1 1 auto",
+      minWidth: "0",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+    ".cm-completionMatchedText": {
+      textDecoration: "none",
+      color: "hsl(var(--primary))",
+      fontWeight: "600",
+    },
+    ".cm-completionDetail": {
+      flex: "0 0 auto",
+      marginLeft: "auto",
+      color: "hsl(var(--muted-foreground))",
+      fontStyle: "normal",
+      fontSize: "12px",
     },
     ".cm-panels": {
       backgroundColor: "hsl(var(--card))",

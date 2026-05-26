@@ -114,21 +114,29 @@ async function buildColumnCompletions(
   detected: Extract<CursorContext, { kind: "column" }>,
 ): Promise<CompletionResult | null> {
   if (!db) return null;
-  const { stables, tables } = await schemaCache.getDbContents(ds, connId, db);
+  // Optimization: if we identified the FROM table(s) of the current statement,
+  // restrict suggestions to just those — narrows the popup from "every column
+  // in the db" to the ones the user can actually reference. When we couldn't
+  // (alias-heavy SQL, weird quoting, subquery, etc.) we return null so the
+  // built-in keyword popup still fires instead of a noisy aggregate.
+  if (detected.tables.length === 0) return null;
+
+  // `describeTable` works for stables, child tables, and plain tables alike —
+  // and for stables it includes tag columns (marked with isTag) which is what
+  // we actually need. The `STable.tagColumns` field on the list-stables result
+  // is not populated by the backend (it's a placeholder), so don't rely on it.
   const seen = new Map<string, Column>();
-  for (const s of stables) {
-    for (const c of s.columns) if (!seen.has(c.name)) seen.set(c.name, c);
-    for (const c of s.tagColumns) if (!seen.has(c.name)) seen.set(c.name, c);
-  }
-  // Non-child tables: fetch columns via cache (parallel).
-  const tableCols = await Promise.all(
-    tables
-      .filter((t) => !t.isChild)
-      .map((t) => schemaCache.getTableColumns(ds, connId, db, t.name)),
+  const colArrays = await Promise.all(
+    detected.tables.map((t) =>
+      schemaCache
+        .getTableColumns(ds, connId, db, t)
+        .catch(() => [] as Column[]),
+    ),
   );
-  for (const cols of tableCols) {
+  for (const cols of colArrays) {
     for (const c of cols) if (!seen.has(c.name)) seen.set(c.name, c);
   }
+
   if (seen.size === 0) return null;
   const options: Completion[] = Array.from(seen.values()).map((c) =>
     columnCompletion(c),

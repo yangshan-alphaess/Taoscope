@@ -12,7 +12,7 @@ export type CursorContext =
   | { kind: "database"; from: number }
   | { kind: "table"; from: number }
   | { kind: "tableColumn"; from: number; table: string }
-  | { kind: "column"; from: number }
+  | { kind: "column"; from: number; tables: string[] }
   | { kind: "keyword"; from: number }
   | { kind: "none"; from: number };
 
@@ -114,8 +114,119 @@ export function detectContext(doc: string, pos: number): CursorContext {
     /\b(?:SELECT|WHERE|HAVING|ON|SET|GROUP\s+BY|ORDER\s+BY)\b/gi,
   );
   if (lastCol > lastFrom) {
-    return { kind: "column", from };
+    // Best-effort: peek both directions of the current statement for the
+    // FROM clause so column suggestions can be narrowed to just those
+    // table(s). Empty result is fine — the completion source then falls
+    // back to "no schema columns" rather than dumping the whole db.
+    return { kind: "column", from, tables: extractFromTables(doc, pos) };
   }
 
   return { kind: "keyword", from };
+}
+
+/**
+ * Heuristically extract the table identifiers appearing after the FROM clause
+ * of the statement containing `pos`. Returns an empty array if none can be
+ * confidently identified. Supports simple JOINs, comma-separated tables, and
+ * `db.table` qualified names. Aliases (`tbl t1`, `tbl AS t1`) are stripped.
+ *
+ * Intentionally permissive — we'd rather miss a table than mis-identify one,
+ * since the consumer treats `[]` as "skip schema lookup, fall back".
+ */
+export function extractFromTables(doc: string, pos: number): string[] {
+  // Confine to the current `;`-delimited statement so the previous query's
+  // FROM clause doesn't leak into the active one.
+  const stmtStart = doc.lastIndexOf(";", Math.max(0, pos - 1)) + 1;
+  const semiAfter = doc.indexOf(";", pos);
+  const stmtEnd = semiAfter === -1 ? doc.length : semiAfter;
+  const stmt = stripNoise(doc.slice(stmtStart, stmtEnd));
+
+  const fromMatch =
+    /\bFROM\s+([\s\S]+?)(?=\b(?:WHERE|GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|UNION|INTERVAL|PARTITION|WINDOW|SESSION|FILL)\b|$)/i.exec(
+      stmt,
+    );
+  if (!fromMatch) return [];
+
+  const parts = fromMatch[1]!.split(
+    /,|\b(?:LEFT|RIGHT|INNER|OUTER|CROSS|FULL)?\s*JOIN\b/i,
+  );
+  const out: string[] = [];
+  for (const raw of parts) {
+    const onIdx = raw.search(/\bON\b/i);
+    const slice = onIdx >= 0 ? raw.slice(0, onIdx) : raw;
+    const tokens = slice.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) continue;
+    let name = tokens[0]!;
+    const dot = name.lastIndexOf(".");
+    if (dot >= 0) name = name.slice(dot + 1);
+    name = name.replace(/[`"']/g, "");
+    if (/^[\w$]+$/.test(name)) out.push(name);
+  }
+  return out;
+}
+
+/** Replace string/backtick/comment content with spaces — keeps lengths stable
+ *  and prevents keywords inside literals from confusing the regex above. */
+function stripNoise(s: string): string {
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    const ch = s[i]!;
+    const next = s[i + 1];
+    if (ch === "'" || ch === '"') {
+      const q = ch;
+      out += " ";
+      i++;
+      while (i < s.length && s[i] !== q) {
+        if (s[i] === "\\") {
+          i++;
+          if (i < s.length) i++;
+          out += "  ";
+          continue;
+        }
+        out += " ";
+        i++;
+      }
+      if (i < s.length) {
+        out += " ";
+        i++;
+      }
+      continue;
+    }
+    if (ch === "`") {
+      // Backtick-quoted identifiers are real names; keep them readable.
+      i++;
+      let ident = "";
+      while (i < s.length && s[i] !== "`") {
+        ident += s[i];
+        i++;
+      }
+      if (i < s.length) i++;
+      out += ident;
+      continue;
+    }
+    if (ch === "-" && next === "-") {
+      while (i < s.length && s[i] !== "\n") {
+        out += " ";
+        i++;
+      }
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      out += "  ";
+      i += 2;
+      while (i < s.length && !(s[i] === "*" && s[i + 1] === "/")) {
+        out += " ";
+        i++;
+      }
+      if (i < s.length) {
+        out += "  ";
+        i += 2;
+      }
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
 }
