@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import * as editorBridge from "@/components/console/editorBridge";
 import { formatScratch } from "@/components/console/formatScratch";
+import { useExplainActiveConsole } from "@/components/console/useExplainActiveConsole";
 import { useDataSource } from "@/datasource/context";
 import type { DataSource } from "@/datasource/types";
 import {
@@ -22,6 +23,7 @@ interface ShortcutState {
   setActiveConsole: (id: string | null) => void;
   removeConsole: (id: string) => void;
   setScratch: (id: string, scratch: string) => void;
+  explain: () => void;
 }
 
 export function ConsoleShortcuts() {
@@ -34,6 +36,7 @@ export function ConsoleShortcuts() {
   const setActiveConsole = useAppState((s) => s.setActiveConsole);
   const removeConsole = useAppState((s) => s.removeConsole);
   const setScratch = useAppState((s) => s.setScratch);
+  const { explain } = useExplainActiveConsole();
 
   const stateRef = useRef<ShortcutState>({
     consoles,
@@ -45,6 +48,7 @@ export function ConsoleShortcuts() {
     setActiveConsole,
     removeConsole,
     setScratch,
+    explain,
   });
 
   useEffect(() => {
@@ -58,6 +62,7 @@ export function ConsoleShortcuts() {
       setActiveConsole,
       removeConsole,
       setScratch,
+      explain,
     };
   });
 
@@ -69,6 +74,12 @@ export function ConsoleShortcuts() {
       if (e.altKey) return;
 
       const s = stateRef.current;
+
+      if (e.shiftKey && e.key === "Enter") {
+        e.preventDefault();
+        s.explain();
+        return;
+      }
 
       if (e.shiftKey && (e.key === "f" || e.key === "F")) {
         e.preventDefault();

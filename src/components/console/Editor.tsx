@@ -17,6 +17,7 @@ import { Prec } from "@codemirror/state";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
 import * as editorBridge from "./editorBridge";
+import { useExplainActiveConsole } from "./useExplainActiveConsole";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 import { taoscopeEditorExtensions, taoscopeEditorTheme } from "./sqlEditorTheme";
 import { createSqlCompletionSource } from "./sqlCompletionSource";
@@ -38,6 +39,12 @@ export function Editor() {
   useEffect(() => {
     runRef.current = run;
   }, [run]);
+
+  const { explain } = useExplainActiveConsole();
+  const explainRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    explainRef.current = explain;
+  }, [explain]);
 
   const schemaCtx = useEditorSchemaContext();
   const editorCtxRef = useRef<{ connectionId: string | null; db: string | null }>(
@@ -137,6 +144,14 @@ export function Editor() {
             preventDefault: true,
             run: () => {
               runRef.current();
+              return true;
+            },
+          },
+          {
+            key: "Mod-Shift-Enter",
+            preventDefault: true,
+            run: () => {
+              explainRef.current();
               return true;
             },
           },

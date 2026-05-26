@@ -1,14 +1,16 @@
 import { forwardRef, type ComponentPropsWithoutRef } from "react";
-import { Play, Square, WandSparkles } from "lucide-react";
+import { ListTree, Play, Square, WandSparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmtShortcut } from "@/lib/platform";
 import { ConsoleDbPicker } from "./ConsoleDbPicker";
 import { QueryHistoryButton } from "./QueryHistoryButton";
+import { useExplainActiveConsole } from "./useExplainActiveConsole";
 import { useFormatActiveConsole } from "./useFormatActiveConsole";
 import { useRunActiveConsole } from "./useRunActiveConsole";
 
 export function Toolbar() {
   const { canRun, isRunning, run, cancel } = useRunActiveConsole();
+  const { explain } = useExplainActiveConsole();
   const { canFormat, format } = useFormatActiveConsole();
 
   return (
@@ -22,6 +24,13 @@ export function Toolbar() {
           isRunning ? "Running…" : `Run ${fmtShortcut(["Mod", "Enter"])}`
         }
         primary
+      />
+      <ToolbarButton
+        onClick={explain}
+        disabled={!canRun}
+        title={`Explain plan — ${fmtShortcut(["Mod", "Shift", "Enter"])}`}
+        icon={<ListTree className="h-3.5 w-3.5" />}
+        label="Explain"
       />
       <ToolbarButton
         onClick={format}
