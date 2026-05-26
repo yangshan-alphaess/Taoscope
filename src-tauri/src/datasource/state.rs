@@ -18,7 +18,7 @@ use crate::datasource::db;
 use crate::datasource::error::DataSourceError;
 use crate::datasource::types::{
     AuthMode, Connection as DsConnection, ConnectionInput, ConnectionStatus, Console as DsConsole,
-    CreateConsoleInput, HistoryEntry, Protocol, QueryResult,
+    CreateConsoleInput, HistoryEntry, Protocol, QueryResult, Transport,
 };
 
 pub struct Store {
@@ -47,7 +47,7 @@ impl Store {
             .conn
             .prepare(
                 "SELECT id, name, host, port, user, password, color, status, auth_mode, token, \
-                 protocol, allow_invalid_certs \
+                 protocol, allow_invalid_certs, transport \
                  FROM connections ORDER BY rowid",
             )
             .map_err(db::map_err)?;
@@ -65,7 +65,7 @@ impl Store {
         self.conn
             .query_row(
                 "SELECT id, name, host, port, user, password, color, status, auth_mode, token, \
-                 protocol, allow_invalid_certs \
+                 protocol, allow_invalid_certs, transport \
                  FROM connections WHERE id = ?1",
                 params![id],
                 row_to_connection,
@@ -94,8 +94,8 @@ impl Store {
             .execute(
                 "INSERT INTO connections \
                  (id, name, host, port, user, password, color, status, auth_mode, token, \
-                  protocol, allow_invalid_certs) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                  protocol, allow_invalid_certs, transport) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                 params![
                     id,
                     name,
@@ -109,6 +109,7 @@ impl Store {
                     input.token,
                     input.protocol.as_str(),
                     input.allow_invalid_certs as i64,
+                    input.transport.as_str(),
                 ],
             )
             .map_err(|e| match db::map_err(e) {
@@ -132,6 +133,7 @@ impl Store {
             token: input.token,
             protocol: input.protocol,
             allow_invalid_certs: input.allow_invalid_certs,
+            transport: input.transport,
         })
     }
 
@@ -171,6 +173,7 @@ impl Store {
             "auth_mode = ?",
             "protocol = ?",
             "allow_invalid_certs = ?",
+            "transport = ?",
         ];
         let mut values: Vec<Box<dyn rusqlite::ToSql>> = vec![
             Box::new(name.clone()),
@@ -181,6 +184,7 @@ impl Store {
             Box::new(auth_mode_str(input.auth_mode)),
             Box::new(input.protocol.as_str()),
             Box::new(input.allow_invalid_certs as i64),
+            Box::new(input.transport.as_str()),
         ];
 
         let password_provided = !input.password.is_empty();
@@ -536,6 +540,11 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> 
         _ => Protocol::Http,
     };
     let allow_invalid_certs: i64 = row.get("allow_invalid_certs")?;
+    let transport_str: String = row.get("transport")?;
+    let transport = match transport_str.as_str() {
+        "ws" => Transport::Ws,
+        _ => Transport::Http,
+    };
     Ok(DsConnection {
         id: row.get("id")?,
         name: row.get("name")?,
@@ -549,6 +558,7 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<DsConnection> 
         token: row.get("token")?,
         protocol,
         allow_invalid_certs: allow_invalid_certs != 0,
+        transport,
     })
 }
 

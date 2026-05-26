@@ -16,6 +16,12 @@ use serde::Deserialize;
 use serde_json::Value as JsonValue;
 
 use crate::datasource::error::DataSourceError;
+use crate::datasource::sql_builder::{
+    build_count_child_tables_sql, build_count_normal_tables_sql, build_count_stables_sql,
+    build_describe_sql, build_list_child_tables_sql, build_list_normal_tables_sql,
+    cell_to_string, cell_to_u32, column_index, parse_columns, SQL_SERVER_VERSION,
+    SQL_SHOW_DATABASES, SQL_SHOW_STABLES, SYSTEM_DATABASES,
+};
 use crate::datasource::types::{
     AuthMode, Column, Connection, Database, ListTablesOpts, Paged, QueryResult, STable, Table,
     TestConnectionResult,
@@ -116,58 +122,10 @@ async fn execute_sql(
     Ok(body)
 }
 
-fn parse_columns(column_meta: &[(String, String, u32)]) -> Vec<Column> {
-    column_meta
-        .iter()
-        .map(|(name, data_type, length)| Column {
-            name: name.clone(),
-            data_type: data_type.clone(),
-            length: if *length > 0 { Some(*length) } else { None },
-            is_tag: None,
-            is_primary_ts: None,
-        })
-        .collect()
-}
-
-fn column_index(column_meta: &[(String, String, u32)], name: &str) -> Option<usize> {
-    column_meta.iter().position(|(n, _, _)| n.eq_ignore_ascii_case(name))
-}
-
-fn cell_to_string(v: &JsonValue) -> Option<String> {
-    match v {
-        JsonValue::String(s) => Some(s.clone()),
-        JsonValue::Null => None,
-        other => Some(other.to_string()),
-    }
-}
-
-fn cell_to_u32(v: &JsonValue) -> Option<u32> {
-    match v {
-        JsonValue::Number(n) => n.as_u64().map(|x| x as u32),
-        JsonValue::String(s) => s.parse::<u32>().ok(),
-        _ => None,
-    }
-}
-
-// Identifier escape: backtick-wrap and double internal backticks.
-fn ident(name: &str) -> String {
-    format!("`{}`", name.replace('`', "``"))
-}
-
-// String literal escape: surround with single quotes; double internal singles.
-fn sql_str(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
-}
-
-const SYSTEM_DATABASES: &[&str] = &[
-    "information_schema",
-    "performance_schema",
-];
-
 // ── Public methods ──────────────────────────────────────────────────────
 
 pub async fn test_connection(conn: &Connection) -> TestConnectionResult {
-    match execute_sql(conn, None, "SELECT SERVER_VERSION()").await {
+    match execute_sql(conn, None, SQL_SERVER_VERSION).await {
         Ok(resp) => {
             let msg = resp
                 .data
@@ -187,7 +145,7 @@ pub async fn test_connection(conn: &Connection) -> TestConnectionResult {
 }
 
 pub async fn list_databases(conn: &Connection) -> Result<Vec<Database>, DataSourceError> {
-    let resp = execute_sql(conn, None, "SHOW DATABASES").await?;
+    let resp = execute_sql(conn, None, SQL_SHOW_DATABASES).await?;
 
     let name_idx = column_index(&resp.column_meta, "name");
     let retention_idx = column_index(&resp.column_meta, "retention")
@@ -228,7 +186,7 @@ pub async fn list_stables(
     // TDengine 3.x does NOT accept `SHOW STABLES FROM <db>` (MySQL-style).
     // Route the SQL through the REST path /rest/sql/<db> so `SHOW STABLES`
     // resolves against the named db.
-    let resp = execute_sql(conn, Some(db), "SHOW STABLES").await?;
+    let resp = execute_sql(conn, Some(db), SQL_SHOW_STABLES).await?;
 
     let name_idx = column_index(&resp.column_meta, "stable_name")
         .or_else(|| column_index(&resp.column_meta, "name"));
@@ -245,11 +203,7 @@ pub async fn list_stables(
     }
 
     // One follow-up query to fetch child counts grouped by stable.
-    let count_sql = format!(
-        "SELECT stable_name, COUNT(*) AS c FROM information_schema.ins_tables \
-         WHERE db_name = {} GROUP BY stable_name",
-        sql_str(db)
-    );
+    let count_sql = build_count_stables_sql(db);
     let mut count_map: HashMap<String, u32> = HashMap::new();
     if let Ok(count_resp) = execute_sql(conn, None, &count_sql).await {
         let cn_idx = column_index(&count_resp.column_meta, "stable_name");
@@ -301,23 +255,12 @@ pub async fn list_tables(
         // <db>.<stable>` iterates over every data row in every child table and
         // emits TBNAME for each — yielding massive duplication. The metadata
         // table `information_schema.ins_tables` has one row per table.
-        let search_clause = match &opts.search {
-            Some(s) if !s.is_empty() => format!(
-                " AND table_name LIKE {}",
-                sql_str(&format!("%{}%", s))
-            ),
-            _ => String::new(),
-        };
-
-        let items_sql = format!(
-            "SELECT table_name FROM information_schema.ins_tables \
-             WHERE db_name = {} AND stable_name = {}{} \
-             LIMIT {} OFFSET {}",
-            sql_str(db),
-            sql_str(stable),
-            search_clause,
+        let items_sql = build_list_child_tables_sql(
+            db,
+            stable,
+            opts.search.as_deref(),
             page_size,
-            offset
+            offset,
         );
         let items_resp = execute_sql(conn, None, &items_sql).await?;
         let mut items: Vec<Table> = Vec::with_capacity(items_resp.data.len());
@@ -331,13 +274,8 @@ pub async fn list_tables(
             }
         }
 
-        let count_sql = format!(
-            "SELECT COUNT(*) FROM information_schema.ins_tables \
-             WHERE db_name = {} AND stable_name = {}{}",
-            sql_str(db),
-            sql_str(stable),
-            search_clause
-        );
+        let count_sql =
+            build_count_child_tables_sql(db, stable, opts.search.as_deref());
         let total = match execute_sql(conn, None, &count_sql).await {
             Ok(resp) => resp
                 .data
@@ -361,23 +299,8 @@ pub async fn list_tables(
     // versions differ on whether the `stable_name` column is even present
     // — making client-side `is_child` detection unreliable. Query the
     // metadata view directly for unambiguous filtering.
-    let search_clause = match &opts.search {
-        Some(s) if !s.is_empty() => format!(
-            " AND table_name LIKE {}",
-            sql_str(&format!("%{}%", s))
-        ),
-        _ => String::new(),
-    };
-
-    let items_sql = format!(
-        "SELECT table_name FROM information_schema.ins_tables \
-         WHERE db_name = {} AND type = 'NORMAL_TABLE'{} \
-         LIMIT {} OFFSET {}",
-        sql_str(db),
-        search_clause,
-        page_size,
-        offset
-    );
+    let items_sql =
+        build_list_normal_tables_sql(db, opts.search.as_deref(), page_size, offset);
     let items_resp = execute_sql(conn, None, &items_sql).await?;
     let mut items: Vec<Table> = Vec::with_capacity(items_resp.data.len());
     for row in &items_resp.data {
@@ -390,12 +313,7 @@ pub async fn list_tables(
         }
     }
 
-    let count_sql = format!(
-        "SELECT COUNT(*) FROM information_schema.ins_tables \
-         WHERE db_name = {} AND type = 'NORMAL_TABLE'{}",
-        sql_str(db),
-        search_clause
-    );
+    let count_sql = build_count_normal_tables_sql(db, opts.search.as_deref());
     let total = match execute_sql(conn, None, &count_sql).await {
         Ok(resp) => resp
             .data
@@ -419,7 +337,7 @@ pub async fn describe_table(
     db: &str,
     table: &str,
 ) -> Result<Vec<Column>, DataSourceError> {
-    let sql = format!("DESCRIBE {}.{}", ident(db), ident(table));
+    let sql = build_describe_sql(db, table);
     let resp = execute_sql(conn, None, &sql).await?;
 
     let field_idx = column_index(&resp.column_meta, "field").unwrap_or(0);

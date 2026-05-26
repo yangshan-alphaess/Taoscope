@@ -23,6 +23,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 base64 = "0.22"
 urlencoding = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
+# TDengine official Rust connector — WebSocket transport (rustls).
+taos = { version = "0.12", default-features = false, features = ["ws-rustls"] }
 # Updater (in-app upgrades). Native installers + ed25519 signature verification.
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"

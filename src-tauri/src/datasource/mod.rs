@@ -2,5 +2,8 @@ pub mod db;
 pub mod error;
 pub mod http_client;
 pub mod mock;
+pub mod sql_builder;
 pub mod state;
+pub mod transport;
 pub mod types;
+pub mod ws_client;

@@ -63,6 +63,7 @@ function loadConnectionsFromStorage(): Connection[] {
       ...c,
       authMode: c.authMode ?? "basic",
       protocol: c.protocol ?? "http",
+      transport: c.transport ?? "http",
     }));
   } catch {
     return [];
@@ -140,6 +141,7 @@ export class MockDataSource implements DataSource {
       token: input.token,
       protocol: input.protocol,
       allowInvalidCerts: input.allowInvalidCerts,
+      transport: input.transport,
     };
     this._connections.push(created);
     this.persist();
@@ -180,6 +182,7 @@ export class MockDataSource implements DataSource {
       token: nextToken,
       protocol: input.protocol,
       allowInvalidCerts: input.allowInvalidCerts,
+      transport: input.transport,
     };
     this.persist();
   }

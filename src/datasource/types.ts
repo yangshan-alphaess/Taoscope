@@ -39,6 +39,8 @@ export type AuthMode = "basic" | "token";
 
 export type Protocol = "http" | "https";
 
+export type Transport = "http" | "ws";
+
 export interface Connection {
   id: string;
   name: string;
@@ -55,6 +57,7 @@ export interface Connection {
   protocol: Protocol;
   /** Skip TLS certificate validation (only meaningful for https). */
   allowInvalidCerts?: boolean;
+  transport: Transport;
 }
 
 export interface ConnectionInput {
@@ -68,6 +71,7 @@ export interface ConnectionInput {
   token?: string;
   protocol: Protocol;
   allowInvalidCerts?: boolean;
+  transport: Transport;
 }
 
 export interface Database {

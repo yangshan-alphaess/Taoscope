@@ -62,6 +62,10 @@ ALTER TABLE connections ADD COLUMN protocol TEXT NOT NULL DEFAULT 'http' CHECK (
 ALTER TABLE connections ADD COLUMN allow_invalid_certs INTEGER NOT NULL DEFAULT 0;
 "#;
 
+const SCHEMA_V4_MIGRATION: &str = r#"
+ALTER TABLE connections ADD COLUMN transport TEXT NOT NULL DEFAULT 'http' CHECK (transport IN ('http','ws'));
+"#;
+
 pub fn migrate(conn: &Connection) -> Result<(), DataSourceError> {
     conn.execute_batch(SCHEMA_V1).map_err(map_err)?;
 
@@ -83,6 +87,11 @@ pub fn migrate(conn: &Connection) -> Result<(), DataSourceError> {
     if version < 3 {
         conn.execute_batch(SCHEMA_V3_MIGRATION).map_err(map_err)?;
         version = 3;
+    }
+
+    if version < 4 {
+        conn.execute_batch(SCHEMA_V4_MIGRATION).map_err(map_err)?;
+        version = 4;
     }
 
     conn.execute(

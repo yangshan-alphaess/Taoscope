@@ -42,7 +42,36 @@ const DEFAULT_FORM: ConnectionInput = {
   token: "",
   protocol: "http",
   allowInvalidCerts: false,
+  transport: "http",
 };
+
+/** Encode protocol + transport into one of four user-visible scheme labels. */
+function schemeLabel(
+  protocol: "http" | "https",
+  transport: "http" | "ws",
+): "http" | "https" | "ws" | "wss" {
+  if (transport === "ws") {
+    return protocol === "https" ? "wss" : "ws";
+  }
+  return protocol;
+}
+
+function schemeToFields(scheme: "http" | "https" | "ws" | "wss"): {
+  protocol: "http" | "https";
+  transport: "http" | "ws";
+} {
+  switch (scheme) {
+    case "wss":
+      return { protocol: "https", transport: "ws" };
+    case "ws":
+      return { protocol: "http", transport: "ws" };
+    case "https":
+      return { protocol: "https", transport: "http" };
+    case "http":
+    default:
+      return { protocol: "http", transport: "http" };
+  }
+}
 
 function validate(
   form: ConnectionInput,
@@ -118,6 +147,7 @@ export function ConnectionFormDialog({
         token: "",
         protocol: initial.protocol ?? "http",
         allowInvalidCerts: initial.allowInvalidCerts ?? false,
+        transport: initial.transport ?? "http",
       });
     } else {
       setForm(DEFAULT_FORM);
@@ -210,15 +240,24 @@ export function ConnectionFormDialog({
           <Field label="Host" error={errors.host}>
             <div className="flex gap-1.5">
               <select
-                value={form.protocol}
+                value={schemeLabel(form.protocol, form.transport)}
                 onChange={(e) =>
                   setForm((prev) => {
-                    const nextProtocol = e.target.value as "http" | "https";
+                    const scheme = e.target.value as
+                      | "http"
+                      | "https"
+                      | "ws"
+                      | "wss";
+                    const next = schemeToFields(scheme);
                     return {
                       ...prev,
-                      protocol: nextProtocol,
+                      protocol: next.protocol,
+                      transport: next.transport,
+                      // Reset cert-bypass when switching away from https.
                       allowInvalidCerts:
-                        nextProtocol === "https" ? prev.allowInvalidCerts : false,
+                        next.protocol === "https"
+                          ? prev.allowInvalidCerts
+                          : false,
                     };
                   })
                 }
@@ -229,20 +268,30 @@ export function ConnectionFormDialog({
               >
                 <option value="http">http://</option>
                 <option value="https">https://</option>
+                <option value="ws">ws://</option>
+                <option value="wss">wss://</option>
               </select>
               <Input
                 value={form.host}
                 onChange={(e) => {
                   const raw = e.target.value;
                   // If a user pastes a full URL, split scheme + host:port.
-                  const match = /^(https?):\/\/([^/:]+)(?::(\d+))?/i.exec(raw);
+                  const match = /^(wss?|https?):\/\/([^/:]+)(?::(\d+))?/i.exec(
+                    raw,
+                  );
                   if (match && match[1] && match[2]) {
-                    const scheme = match[1].toLowerCase() as "http" | "https";
+                    const scheme = match[1].toLowerCase() as
+                      | "http"
+                      | "https"
+                      | "ws"
+                      | "wss";
                     const host = match[2];
                     const portStr = match[3];
+                    const next = schemeToFields(scheme);
                     setForm((prev) => ({
                       ...prev,
-                      protocol: scheme,
+                      protocol: next.protocol,
+                      transport: next.transport,
                       host,
                       port: portStr ? Number.parseInt(portStr, 10) : prev.port,
                     }));
@@ -255,6 +304,11 @@ export function ConnectionFormDialog({
               />
             </div>
           </Field>
+          <p className="text-[10px] text-muted-foreground -mt-1">
+            {form.transport === "ws"
+              ? `${schemeLabel(form.protocol, form.transport)}://${form.host || "<host>"}:${form.port}/rest/ws`
+              : `${schemeLabel(form.protocol, form.transport)}://${form.host || "<host>"}:${form.port}/rest/sql`}
+          </p>
           {form.protocol === "https" && (
             <div className="grid gap-1 -mt-1">
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">

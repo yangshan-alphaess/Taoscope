@@ -12,8 +12,8 @@ use std::sync::Mutex;
 use tauri::State;
 
 use crate::datasource::error::DataSourceError;
-use crate::datasource::http_client;
 use crate::datasource::state::Store;
+use crate::datasource::{transport, ws_client};
 use crate::datasource::types::{
     Column, Connection, ConnectionInput, Console, CreateConsoleInput, Database,
     HistoryEntry, ListTablesOpts, Paged, QueryResult, STable, Table, TestConnectionResult,
@@ -50,7 +50,7 @@ pub async fn test_connection(
     conn_id: String,
 ) -> Result<TestConnectionResult, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
-    Ok(http_client::test_connection(&conn).await)
+    Ok(transport::test_connection(&conn).await)
 }
 
 #[tauri::command]
@@ -67,7 +67,11 @@ pub fn update_connection(
     id: String,
     input: ConnectionInput,
 ) -> Result<(), DataSourceError> {
-    state.lock().unwrap().update_connection(&id, input)
+    let res = state.lock().unwrap().update_connection(&id, input);
+    // Invalidate any cached ws Taos client; the new host/port/credentials
+    // may differ and the next call must redial against the fresh config.
+    ws_client::forget(&id);
+    res
 }
 
 #[tauri::command]
@@ -75,7 +79,9 @@ pub fn delete_connection(
     state: State<'_, Mutex<Store>>,
     id: String,
 ) -> Result<(), DataSourceError> {
-    state.lock().unwrap().delete_connection(&id)
+    let res = state.lock().unwrap().delete_connection(&id);
+    ws_client::forget(&id);
+    res
 }
 
 #[tauri::command]
@@ -95,8 +101,9 @@ pub async fn test_connection_config(
         token: input.token,
         protocol: input.protocol,
         allow_invalid_certs: input.allow_invalid_certs,
+        transport: input.transport,
     };
-    Ok(http_client::test_connection(&conn).await)
+    Ok(transport::test_connection(&conn).await)
 }
 
 // ── Schema (HTTP-backed) ────────────────────────────────────────────────
@@ -107,7 +114,7 @@ pub async fn list_databases(
     conn_id: String,
 ) -> Result<Vec<Database>, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
-    http_client::list_databases(&conn).await
+    transport::list_databases(&conn).await
 }
 
 #[tauri::command]
@@ -117,7 +124,7 @@ pub async fn list_stables(
     db: String,
 ) -> Result<Vec<STable>, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
-    http_client::list_stables(&conn, &db).await
+    transport::list_stables(&conn, &db).await
 }
 
 #[tauri::command]
@@ -128,7 +135,7 @@ pub async fn list_tables(
     opts: ListTablesOpts,
 ) -> Result<Paged<Table>, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
-    http_client::list_tables(&conn, &db, &opts).await
+    transport::list_tables(&conn, &db, &opts).await
 }
 
 #[tauri::command]
@@ -139,7 +146,7 @@ pub async fn describe_table(
     table: String,
 ) -> Result<Vec<Column>, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
-    http_client::describe_table(&conn, &db, &table).await
+    transport::describe_table(&conn, &db, &table).await
 }
 
 // ── SQL execution (HTTP-backed) ─────────────────────────────────────────
@@ -152,7 +159,7 @@ pub async fn run_sql(
     sql: String,
 ) -> Result<QueryResult, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
-    http_client::run_sql(&conn, db.as_deref(), &sql).await
+    transport::run_sql(&conn, db.as_deref(), &sql).await
 }
 
 // ── Scratch ─────────────────────────────────────────────────────────────

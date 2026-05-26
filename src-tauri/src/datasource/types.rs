@@ -42,6 +42,28 @@ impl Protocol {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Transport {
+    Http,
+    Ws,
+}
+
+impl Default for Transport {
+    fn default() -> Self {
+        Transport::Http
+    }
+}
+
+impl Transport {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Transport::Http => "http",
+            Transport::Ws => "ws",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
@@ -62,6 +84,8 @@ pub struct Connection {
     pub protocol: Protocol,
     #[serde(default)]
     pub allow_invalid_certs: bool,
+    #[serde(default)]
+    pub transport: Transport,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +106,8 @@ pub struct ConnectionInput {
     pub protocol: Protocol,
     #[serde(default)]
     pub allow_invalid_certs: bool,
+    #[serde(default)]
+    pub transport: Transport,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
