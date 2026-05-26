@@ -50,7 +50,11 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          # Match the local toolchain (pnpm 11) — it understands the
+          # `allowBuilds` key our workspace file uses, and writes the
+          # lockfileVersion 9 already on disk. Pin a major instead of
+          # "latest" so future breaking changes don't silently break CI.
+          version: 11
 
       - name: Setup Node
         uses: actions/setup-node@v4

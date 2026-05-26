@@ -1,2 +1,12 @@
+# Not a real monorepo — just declares the root as the (only) workspace
+# package so pnpm ≥ 10 doesn't refuse to resolve `pnpm store path`
+# (which is what `actions/setup-node@v4`'s pnpm cache probe runs in CI).
+packages:
+  - .
+
+# Native postinstall scripts that pnpm ≥ 11 blocks by default. esbuild
+# downloads its platform-specific binary at install time; without this we
+# get `[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@*` and Vite
+# falls back to a slow JS-only path.
 allowBuilds:
   esbuild: true
