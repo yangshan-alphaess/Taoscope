@@ -37,6 +37,12 @@
   }
 
   .dark {
+    /* Pin native control rendering (select popups, number spinners,
+       scrollbars, form-field chrome) to the dark variant. Without this,
+       WebKit follows the OS appearance, so the same build looks light on a
+       Light-mode Mac and dark on a Dark-mode Mac. */
+    color-scheme: dark;
+
     /* Soft warm-neutral dark theme — Claude / VS Code style. Avoids pure
        black; surfaces are mid-grey with a faint blue undertone so the eye
        reads it as "dark UI" rather than "OLED off pixel". */
