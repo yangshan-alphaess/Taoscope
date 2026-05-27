@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { Database as DbIcon, Check, RefreshCw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Crosshair,
+  Database as DbIcon,
+  Check,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 
@@ -37,6 +43,8 @@ export function ConsoleDbPicker() {
       : null,
   );
   const setConsoleDbLocal = useAppState((s) => s.setConsoleDbLocal);
+  const requestResourceFocus = useAppState((s) => s.requestResourceFocus);
+  const consoleFlashNonce = useAppState((s) => s.consoleFlashNonce);
 
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<LoadState>({ kind: "idle" });
@@ -81,101 +89,135 @@ export function ConsoleDbPicker() {
   const disabled = !activeConsole || !connection;
   const currentDb = activeConsole?.currentDb ?? null;
 
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          disabled={disabled}
-          title={
-            disabled
-              ? t("toolbar.db-picker.title-disabled")
-              : currentDb
-                ? t("toolbar.db-picker.title-bound", { db: currentDb })
-                : t("toolbar.db-picker.title-unbound")
-          }
-          className={cn(
-            "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-            disabled
-              ? "text-muted-foreground/60 border-border/50 cursor-not-allowed"
-              : currentDb
-                ? "border-border text-foreground hover:bg-muted"
-                : "border-destructive/40 text-destructive hover:bg-destructive/10",
-          )}
-        >
-          <DbIcon className="h-3.5 w-3.5" />
-          <span className="font-mono">
-            {currentDb ?? t("toolbar.db-picker.no-database")}
-          </span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          <span>{t("toolbar.db-picker.label")}</span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              void loadDatabases();
-            }}
-            className="text-muted-foreground hover:text-foreground rounded-sm p-1"
-            title={t("toolbar.db-picker.refresh-tooltip")}
-          >
-            <RefreshCw className="h-3 w-3" />
-          </button>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+  // Flash the badge when the active console (or its bound db) changes, so a
+  // switch driven from the resource tree draws the eye here too.
+  const [flashTick, setFlashTick] = useState(0);
+  const prevSigRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sig = `${activeConsoleId ?? ""}:${currentDb ?? ""}:${consoleFlashNonce}`;
+    if (prevSigRef.current !== null && prevSigRef.current !== sig) {
+      setFlashTick((n) => n + 1);
+    }
+    prevSigRef.current = sig;
+  }, [activeConsoleId, currentDb, consoleFlashNonce]);
 
-        {state.kind === "loading" && (
-          <div className="text-muted-foreground px-2 py-2 text-xs">
-            {t("toolbar.db-picker.loading")}
-          </div>
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        disabled={disabled || !currentDb}
+        onClick={() => {
+          if (connection && currentDb)
+            requestResourceFocus(connection.id, currentDb);
+        }}
+        title={t("toolbar.db-picker.locate")}
+        aria-label={t("toolbar.db-picker.locate")}
+        className={cn(
+          "flex items-center justify-center rounded-md p-1.5 transition-colors",
+          disabled || !currentDb
+            ? "text-muted-foreground/40"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
         )}
-        {state.kind === "error" && (
-          <div className="text-destructive px-2 py-2 text-xs">
-            {state.message}
-          </div>
-        )}
-        {state.kind === "ok" && state.items.length === 0 && (
-          <div className="text-muted-foreground px-2 py-2 text-xs">
-            {t("toolbar.db-picker.empty")}
-          </div>
-        )}
-        {state.kind === "ok" &&
-          state.items.map((d) => {
-            const selected = d.name === currentDb;
-            return (
-              <DropdownMenuItem
-                key={d.name}
-                onSelect={() => {
-                  void pick(d.name);
-                }}
-              >
-                <Check
-                  className={cn(
-                    "h-3.5 w-3.5",
-                    selected ? "opacity-100" : "opacity-0",
-                  )}
-                />
-                <span className="font-mono">{d.name}</span>
-              </DropdownMenuItem>
-            );
-          })}
-        {currentDb !== null && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => {
-                void pick(null);
+      >
+        <Crosshair className="h-3.5 w-3.5" />
+      </button>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            key={flashTick}
+            type="button"
+            disabled={disabled}
+            title={
+              disabled
+                ? t("toolbar.db-picker.title-disabled")
+                : currentDb
+                  ? t("toolbar.db-picker.title-bound", { db: currentDb })
+                  : t("toolbar.db-picker.title-unbound")
+            }
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+              disabled
+                ? "cursor-not-allowed border-border/50 text-muted-foreground/60"
+                : currentDb
+                  ? "border-border text-foreground hover:bg-muted"
+                  : "border-destructive/40 text-destructive hover:bg-destructive/10",
+              flashTick > 0 && "animate-attention-flash",
+            )}
+          >
+            <DbIcon className="h-3.5 w-3.5" />
+            <span className="font-mono">
+              {currentDb ?? t("toolbar.db-picker.no-database")}
+            </span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuLabel className="flex items-center justify-between">
+            <span>{t("toolbar.db-picker.label")}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                void loadDatabases();
               }}
-              className="text-muted-foreground"
+              className="rounded-sm p-1 text-muted-foreground hover:text-foreground"
+              title={t("toolbar.db-picker.refresh-tooltip")}
             >
-              <X className="h-3.5 w-3.5" />
-              {t("toolbar.db-picker.clear")}
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+              <RefreshCw className="h-3 w-3" />
+            </button>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+
+          {state.kind === "loading" && (
+            <div className="px-2 py-2 text-xs text-muted-foreground">
+              {t("toolbar.db-picker.loading")}
+            </div>
+          )}
+          {state.kind === "error" && (
+            <div className="px-2 py-2 text-xs text-destructive">
+              {state.message}
+            </div>
+          )}
+          {state.kind === "ok" && state.items.length === 0 && (
+            <div className="px-2 py-2 text-xs text-muted-foreground">
+              {t("toolbar.db-picker.empty")}
+            </div>
+          )}
+          {state.kind === "ok" &&
+            state.items.map((d) => {
+              const selected = d.name === currentDb;
+              return (
+                <DropdownMenuItem
+                  key={d.name}
+                  onSelect={() => {
+                    void pick(d.name);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "h-3.5 w-3.5",
+                      selected ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <span className="font-mono">{d.name}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          {currentDb !== null && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => {
+                  void pick(null);
+                }}
+                className="text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+                {t("toolbar.db-picker.clear")}
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

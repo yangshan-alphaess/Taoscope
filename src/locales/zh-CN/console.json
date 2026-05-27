@@ -40,7 +40,8 @@
       "refresh-tooltip": "刷新数据库列表",
       "loading": "加载中…",
       "empty": "暂无数据库。",
-      "clear": "清除绑定"
+      "clear": "清除绑定",
+      "locate": "在资源树中定位该数据库"
     }
   },
   "consoles-panel": {

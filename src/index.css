@@ -46,25 +46,25 @@
     /* Soft warm-neutral dark theme — Claude / VS Code style. Avoids pure
        black; surfaces are mid-grey with a faint blue undertone so the eye
        reads it as "dark UI" rather than "OLED off pixel". */
-    --background: 220 6% 13%;      /* ~#1f2022 — side panels (mid tier) */
-    --foreground: 220 8% 90%;      /* off-white, easier on eyes than pure white */
+    --background: 220 6% 13%; /* ~#1f2022 — side panels (mid tier) */
+    --foreground: 220 8% 90%; /* off-white, easier on eyes than pure white */
 
     /* Deepest tier: the window shell / gutters that floating panels sit on.
        A notch below --background so insets between panels read as recessed
        seams, giving the flat layout perceptible depth. */
     --surface-0: 220 8% 9%;
 
-    --card: 220 6% 16%;            /* surfaces a notch above bg */
+    --card: 220 6% 16%; /* surfaces a notch above bg */
     --card-foreground: 220 8% 90%;
 
     /* Popover: slightly brighter than card so floating menus feel elevated. */
     --popover: 220 6% 19%;
     --popover-foreground: 220 8% 92%;
 
-    --primary: 164 75% 45%;        /* #06A77D family, dialed down for soft bg */
+    --primary: 164 75% 45%; /* #06A77D family, dialed down for soft bg */
     --primary-foreground: 220 6% 13%;
 
-    --muted: 220 6% 21%;           /* hover / row-active */
+    --muted: 220 6% 21%; /* hover / row-active */
     --muted-foreground: 220 6% 78%; /* brighter — tree text reads as primary */
 
     --accent: 220 6% 21%;
@@ -73,7 +73,7 @@
     --destructive: 0 65% 56%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 6% 26%;          /* visible but unobtrusive */
+    --border: 220 6% 26%; /* visible but unobtrusive */
     --input: 220 6% 26%;
     --ring: 164 75% 48%;
   }
@@ -92,7 +92,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
     overflow: hidden; /* desktop app: never scroll the window itself */
   }
 
@@ -118,4 +118,30 @@
     font-size: 12px;
     line-height: 15px;
   }
+}
+
+/* A brief "lit up" pulse: a soft neutral background highlight that eases back
+   to normal within 1s. Drawn as a translucent overlay so it works regardless
+   of the element's own resting background (no color snap). Used to draw the
+   eye to a console/db that just became active from a click elsewhere (e.g.
+   double-clicking a resource). */
+@keyframes attention-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.animate-attention-flash {
+  position: relative;
+}
+.animate-attention-flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: hsl(var(--foreground) / 0.4);
+  pointer-events: none;
+  animation: attention-flash 1.5s ease-out forwards;
 }

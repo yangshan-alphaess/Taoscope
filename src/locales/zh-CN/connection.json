@@ -87,7 +87,8 @@
       "drop-table": "删除表"
     },
     "tooltip": {
-      "actions-for": "{{name}} 的操作"
+      "actions-for": "{{name}} 的操作",
+      "open-console": "在 {{name}} 上打开控制台"
     },
     "tree": {
       "loading": "加载中…",

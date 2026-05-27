@@ -40,7 +40,8 @@
       "refresh-tooltip": "Refresh database list",
       "loading": "Loading…",
       "empty": "No databases.",
-      "clear": "Clear binding"
+      "clear": "Clear binding",
+      "locate": "Reveal this database in the resource tree"
     }
   },
   "consoles-panel": {

@@ -54,6 +54,16 @@ interface AppState {
   activeConsoleId: string | null;
   setActiveConsole: (id: string | null) => void;
 
+  /** Transient request to reveal + highlight a database in the resource tree.
+   *  The nonce makes repeated requests for the same target re-fire. */
+  resourceFocus: { connId: string; db: string; nonce: number } | null;
+  requestResourceFocus: (connId: string, db: string) => void;
+
+  /** Bumped to force the active console (item + db badge) to flash even when
+   *  the active console id didn't change (e.g. re-selecting the bound one). */
+  consoleFlashNonce: number;
+  pulseActiveConsole: () => void;
+
   consoleRuntime: Record<string, ConsoleRuntimeEntry>;
   hydrateConsoleRuntime: (
     id: string,
@@ -73,8 +83,7 @@ export const useAppState = create<AppState>((set) => ({
 
   consoles: [],
   setConsoles: (list) => set({ consoles: list }),
-  addConsole: (c) =>
-    set((state) => ({ consoles: [...state.consoles, c] })),
+  addConsole: (c) => set((state) => ({ consoles: [...state.consoles, c] })),
   removeConsole: (id) =>
     set((state) => {
       const consoles = state.consoles.filter((c) => c.id !== id);
@@ -106,9 +115,7 @@ export const useAppState = create<AppState>((set) => ({
     }),
   renameConsoleLocal: (id, name) =>
     set((state) => ({
-      consoles: state.consoles.map((c) =>
-        c.id === id ? { ...c, name } : c,
-      ),
+      consoles: state.consoles.map((c) => (c.id === id ? { ...c, name } : c)),
     })),
   setConsoleDbLocal: (id, db) =>
     set((state) => ({
@@ -119,6 +126,20 @@ export const useAppState = create<AppState>((set) => ({
 
   activeConsoleId: null,
   setActiveConsole: (id) => set({ activeConsoleId: id }),
+
+  resourceFocus: null,
+  requestResourceFocus: (connId, db) =>
+    set((state) => ({
+      resourceFocus: {
+        connId,
+        db,
+        nonce: (state.resourceFocus?.nonce ?? 0) + 1,
+      },
+    })),
+
+  consoleFlashNonce: 0,
+  pulseActiveConsole: () =>
+    set((state) => ({ consoleFlashNonce: state.consoleFlashNonce + 1 })),
 
   consoleRuntime: {},
   hydrateConsoleRuntime: (id, init) =>

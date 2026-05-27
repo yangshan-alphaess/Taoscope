@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
+  Crosshair,
   Database as DbIcon,
   FilePlus,
   FileText,
@@ -290,16 +291,21 @@ export function ResourcesPanel() {
   const removeConsolesByConnection = useAppState(
     (s) => s.removeConsolesByConnection,
   );
+  const resourceFocus = useAppState((s) => s.resourceFocus);
+  const pulseActiveConsole = useAppState((s) => s.pulseActiveConsole);
   const createConsole = useCreateConsole();
 
   // Double-click a database: reuse the existing console bound to that db if
-  // there is one, otherwise create and open a fresh one bound to it.
+  // there is one, otherwise create and open a fresh one bound to it. Either
+  // way the console side should flash — when reusing the already-active one
+  // its id doesn't change, so pulse explicitly to still draw the eye.
   function openConsoleForDb(connId: string, db: string) {
     const existing = consoles.find(
       (c) => c.connectionId === connId && c.currentDb === db,
     );
     if (existing) {
       setActiveConsole(existing.id);
+      pulseActiveConsole();
     } else {
       void createConsole(connId, { db });
     }
@@ -509,6 +515,43 @@ export function ResourcesPanel() {
     setRestored(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connections, restored]);
+
+  // Reveal + highlight a database when something elsewhere (e.g. the SQL
+  // toolbar's locate button) requests focus: expand its connection, ensure the
+  // db list is loaded, select the row, and scroll it into view.
+  useEffect(() => {
+    if (!resourceFocus) return;
+    const { connId, db } = resourceFocus;
+    let cancelled = false;
+    void (async () => {
+      setExpandedConns((prev) =>
+        prev.has(connId) ? prev : new Set([...prev, connId]),
+      );
+      if (!dbsByConn[connId]) {
+        setDbsByConn((prev) => ({ ...prev, [connId]: "loading" }));
+        try {
+          const list = await ds.listDatabases(connId);
+          if (cancelled) return;
+          setDbsByConn((prev) => ({ ...prev, [connId]: list }));
+        } catch {
+          if (!cancelled) setDbsByConn((prev) => ({ ...prev, [connId]: [] }));
+        }
+      }
+      if (cancelled) return;
+      const key = `db|${connId}|${db}`;
+      setSelectedKey(key);
+      setTimeout(() => {
+        const el = document.querySelector<HTMLElement>(
+          `[data-rkey="${CSS.escape(key)}"]`,
+        );
+        el?.scrollIntoView({ block: "nearest" });
+      }, 60);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resourceFocus?.nonce]);
 
   // Filter-induced auto-expansion: when filter is active, every loaded level
   // is visible regardless of explicit expansion state.
@@ -1168,6 +1211,7 @@ function ConnectionBody({
 }: ConnectionBodyProps) {
   const { t } = useTranslation("connection");
   const { selected, select } = useSelection();
+  const resourceFocus = useAppState((s) => s.resourceFocus);
   // Double-click a database label opens a console and toggles the node, so it
   // expands/collapses just like every other row's double-click.
   function handleDbDoubleClick(db: string) {
@@ -1177,7 +1221,10 @@ function ConnectionBody({
   if (conn.status === "offline") {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] italic text-muted-foreground/70">
+        <p
+          style={indentStyle(1)}
+          className="py-1 pr-3 text-[11px] italic text-muted-foreground/70"
+        >
           {t("resources-panel.tree.disconnected")}
         </p>
       </div>
@@ -1188,7 +1235,10 @@ function ConnectionBody({
   if (dbs === "loading") {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] text-muted-foreground">
+        <p
+          style={indentStyle(1)}
+          className="py-1 pr-3 text-[11px] text-muted-foreground"
+        >
           {t("resources-panel.tree.loading")}
         </p>
       </div>
@@ -1197,7 +1247,10 @@ function ConnectionBody({
   if (dbs.length === 0) {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] italic text-muted-foreground/70">
+        <p
+          style={indentStyle(1)}
+          className="py-1 pr-3 text-[11px] italic text-muted-foreground/70"
+        >
           {t("resources-panel.tree.no-databases")}
         </p>
       </div>
@@ -1260,11 +1313,20 @@ function ConnectionBody({
           },
         ];
         const dbRowKey = `db|${conn.id}|${db.name}`;
+        const doFocusFlash =
+          resourceFocus?.connId === conn.id && resourceFocus?.db === db.name;
         return (
           <div key={db.name}>
             <ContextMenu>
               <ContextMenuTrigger asChild>
-                <div className={rowClass(selected === dbRowKey)}>
+                <div
+                  key={doFocusFlash ? `flash-${resourceFocus.nonce}` : dbRowKey}
+                  data-rkey={dbRowKey}
+                  className={cn(
+                    rowClass(selected === dbRowKey),
+                    doFocusFlash && "animate-attention-flash",
+                  )}
+                >
                   <ExpandChevron
                     open={dbOpen}
                     onToggle={() => onToggleDb(conn.id, db.name)}
@@ -1282,6 +1344,22 @@ function ConnectionBody({
                       {highlight(db.name, query)}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenConsoleForDb(conn.id, db.name);
+                    }}
+                    className="invisible shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:visible group-hover:visible"
+                    aria-label={t("resources-panel.tooltip.open-console", {
+                      name: db.name,
+                    })}
+                    title={t("resources-panel.tooltip.open-console", {
+                      name: db.name,
+                    })}
+                  >
+                    <Crosshair className="h-3 w-3" />
+                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -1389,7 +1467,10 @@ function DatabaseBody({
   if (stbs === "loading" || tbls === "loading" || !stbs || !tbls) {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] text-muted-foreground">
+        <p
+          style={indentStyle(2)}
+          className="py-1 pr-3 text-[11px] text-muted-foreground"
+        >
           {tr("resources-panel.tree.loading")}
         </p>
       </div>
@@ -1400,7 +1481,10 @@ function DatabaseBody({
   if (stbs.length === 0 && tbls.length === 0) {
     return (
       <div>
-        <p className="px-3 py-1 italic text-muted-foreground/70">
+        <p
+          style={indentStyle(2)}
+          className="py-1 pr-3 italic text-muted-foreground/70"
+        >
           {tr("resources-panel.tree.no-tables")}
         </p>
       </div>
@@ -1509,7 +1593,10 @@ function DatabaseBody({
         );
       })}
       {visibleStables.length === 0 && stbs.length > 0 && (
-        <p className="px-3 py-1 italic text-muted-foreground/70">
+        <p
+          style={indentStyle(2)}
+          className="py-1 pr-3 italic text-muted-foreground/70"
+        >
           {tr("resources-panel.tree.no-matches")}
         </p>
       )}
@@ -1600,7 +1687,10 @@ function DatabaseBody({
         );
       })}
       {visibleTables.length === 0 && tbls.length > 0 && (
-        <p className="px-3 py-1 italic text-muted-foreground/70">
+        <p
+          style={indentStyle(2)}
+          className="py-1 pr-3 italic text-muted-foreground/70"
+        >
           {tr("resources-panel.tree.no-matches")}
         </p>
       )}
@@ -1805,7 +1895,10 @@ function ColumnsList({
   if (!state || state === "loading") {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] text-muted-foreground">
+        <p
+          style={indentStyle(4)}
+          className="py-1 pr-3 text-[11px] text-muted-foreground"
+        >
           {tr("resources-panel.tree.loading")}
         </p>
       </div>
@@ -1814,7 +1907,10 @@ function ColumnsList({
   if (state === "error") {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] text-destructive">
+        <p
+          style={indentStyle(4)}
+          className="py-1 pr-3 text-[11px] text-destructive"
+        >
           {tr("resources-panel.tree.failed-columns")}
         </p>
       </div>
@@ -1823,7 +1919,10 @@ function ColumnsList({
   if (state.length === 0) {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] italic text-muted-foreground/70">
+        <p
+          style={indentStyle(4)}
+          className="py-1 pr-3 text-[11px] italic text-muted-foreground/70"
+        >
           {tr("resources-panel.tree.no-columns")}
         </p>
       </div>
@@ -1886,7 +1985,10 @@ function ChildrenList({
   if (!state) {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] text-muted-foreground">
+        <p
+          style={indentStyle(4)}
+          className="py-1 pr-3 text-[11px] text-muted-foreground"
+        >
           {tr("resources-panel.tree.loading")}
         </p>
       </div>
@@ -1894,7 +1996,7 @@ function ChildrenList({
   }
   if (state.error && state.items.length === 0) {
     return (
-      <div className="px-3 py-1">
+      <div style={indentStyle(4)} className="py-1 pr-3">
         <p className="text-[11px] text-destructive">{state.error}</p>
         <button
           type="button"
@@ -1909,7 +2011,10 @@ function ChildrenList({
   if (state.items.length === 0 && !state.loading) {
     return (
       <div>
-        <p className="px-3 py-1 text-[11px] italic text-muted-foreground/70">
+        <p
+          style={indentStyle(4)}
+          className="py-1 pr-3 text-[11px] italic text-muted-foreground/70"
+        >
           {tr("resources-panel.tree.no-child-tables")}
         </p>
       </div>
@@ -1968,7 +2073,10 @@ function ChildrenList({
         );
       })}
       {state.loading && (
-        <p className="px-3 py-1 text-[11px] text-muted-foreground">
+        <p
+          style={indentStyle(4)}
+          className="py-1 pr-3 text-[11px] text-muted-foreground"
+        >
           {tr("resources-panel.tree.loading")}
         </p>
       )}
@@ -1976,7 +2084,8 @@ function ChildrenList({
         <button
           type="button"
           onClick={onLoadMore}
-          className="w-full px-3 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          style={indentStyle(4)}
+          className="w-full py-1 pr-3 text-left text-[11px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
         >
           {tr("resources-panel.tree.load-more", {
             n: CHILD_PAGE_SIZE,

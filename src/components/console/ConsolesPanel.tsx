@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDataSource } from "@/datasource/context";
@@ -24,10 +24,27 @@ export function ConsolesPanel() {
   const setActiveConsole = useAppState((s) => s.setActiveConsole);
   const removeConsole = useAppState((s) => s.removeConsole);
   const renameConsoleLocal = useAppState((s) => s.renameConsoleLocal);
+  const consoleFlashNonce = useAppState((s) => s.consoleFlashNonce);
   const createConsole = useCreateConsole();
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
+
+  // Flash the active console so a switch triggered elsewhere (e.g. double-
+  // clicking a database in the resource tree) catches the eye — including when
+  // the bound console was already active (driven by the pulse nonce).
+  const [flash, setFlash] = useState<{ id: string; tick: number } | null>(null);
+  const prevActiveRef = useRef<string | null>(activeConsoleId);
+  const prevNonceRef = useRef(consoleFlashNonce);
+  useEffect(() => {
+    const activeChanged = activeConsoleId !== prevActiveRef.current;
+    const pulsed = consoleFlashNonce !== prevNonceRef.current;
+    if ((activeChanged || pulsed) && activeConsoleId) {
+      setFlash({ id: activeConsoleId, tick: Date.now() });
+    }
+    prevActiveRef.current = activeConsoleId;
+    prevNonceRef.current = consoleFlashNonce;
+  }, [activeConsoleId, consoleFlashNonce]);
 
   function toggleCollapse(connId: string) {
     setCollapsed((prev) => {
@@ -131,10 +148,13 @@ export function ConsolesPanel() {
                     ) : (
                       group.map((c) => {
                         const isActive = c.id === activeConsoleId;
+                        const isEditing = renamingId === c.id;
+                        const doFlash = flash?.id === c.id;
                         return (
                           <ContextMenu key={c.id}>
                             <ContextMenuTrigger asChild>
                               <div
+                                key={doFlash ? `flash-${flash.tick}` : c.id}
                                 onClick={() => {
                                   if (!isActive) setActiveConsole(c.id);
                                 }}
@@ -144,6 +164,7 @@ export function ConsolesPanel() {
                                   isActive
                                     ? "bg-accent font-medium text-foreground"
                                     : "text-muted-foreground hover:bg-muted/40",
+                                  doFlash && "animate-attention-flash",
                                 )}
                               >
                                 <span
@@ -164,38 +185,45 @@ export function ConsolesPanel() {
                                     }
                                   }}
                                   onRename={(next) => handleRename(c.id, next)}
+                                  inputClassName="min-w-0 flex-1"
                                 />
-                                <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">
-                                  {c.currentDb ?? "—"}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setRenamingId(c.id);
-                                  }}
-                                  className="ml-1 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
-                                  aria-label={t(
-                                    "consoles-panel.rename-tooltip",
-                                  )}
-                                  title={t("consoles-panel.rename-tooltip")}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleDelete(c.id);
-                                  }}
-                                  className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
-                                  aria-label={t(
-                                    "consoles-panel.delete-tooltip",
-                                  )}
-                                  title={t("consoles-panel.delete-tooltip")}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
+                                {/* While renaming, hide the db name + action
+                                    icons so the edit input has full room. */}
+                                {!isEditing && (
+                                  <>
+                                    <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">
+                                      {c.currentDb ?? "—"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setRenamingId(c.id);
+                                      }}
+                                      className="ml-1 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                      aria-label={t(
+                                        "consoles-panel.rename-tooltip",
+                                      )}
+                                      title={t("consoles-panel.rename-tooltip")}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleDelete(c.id);
+                                      }}
+                                      className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                      aria-label={t(
+                                        "consoles-panel.delete-tooltip",
+                                      )}
+                                      title={t("consoles-panel.delete-tooltip")}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </ContextMenuTrigger>
                             <ContextMenuContent>
