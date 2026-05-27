@@ -64,7 +64,9 @@
     "empty": "No connections yet.",
     "delete-confirm": {
       "title": "Delete connection \"{{name}}\"?",
-      "description": "Consoles bound to this connection remain but can no longer query."
+      "description_zero": "This connection has no consoles. It will be permanently deleted.",
+      "description_one": "This will permanently delete the connection and its {{count}} console, along with all of that console's scratch, results, and history.",
+      "description_other": "This will permanently delete the connection and its {{count}} consoles, along with all of those consoles' scratch, results, and history."
     },
     "context-menu": {
       "edit": "Edit…",

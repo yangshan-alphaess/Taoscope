@@ -196,6 +196,23 @@ export class MockDataSource implements DataSource {
     if (next.length === this._connections.length) return;
     this._connections = next;
     this.persist();
+
+    // Cascade: drop consoles bound to this connection plus their scratch /
+    // result / history, mirroring the Rust Store::delete_connection.
+    const consoles = loadAllConsoles();
+    const orphaned = consoles.filter((c) => c.connectionId === id);
+    if (orphaned.length > 0) {
+      persistAllConsoles(consoles.filter((c) => c.connectionId !== id));
+      try {
+        for (const c of orphaned) {
+          localStorage.removeItem(SCRATCH_KEY_PREFIX + c.id);
+          localStorage.removeItem(RESULT_KEY_PREFIX + c.id);
+          localStorage.removeItem(HISTORY_KEY_PREFIX + c.id);
+        }
+      } catch {
+        // ignore
+      }
+    }
   }
 
   async testConnectionConfig(

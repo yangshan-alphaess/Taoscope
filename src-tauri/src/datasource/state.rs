@@ -249,10 +249,37 @@ impl Store {
         Ok(())
     }
 
+    /// Deletes a connection and cascades to every console bound to it,
+    /// including each console's scratch / result / history rows. Foreign keys
+    /// are off, so the cascade is performed explicitly inside one transaction.
     pub fn delete_connection(&mut self, id: &str) -> Result<(), DataSourceError> {
-        self.conn
-            .execute("DELETE FROM connections WHERE id = ?1", params![id])
+        let tx = self.conn.unchecked_transaction().map_err(db::map_err)?;
+        tx.execute(
+            "DELETE FROM scratches WHERE console_id IN \
+             (SELECT id FROM consoles WHERE connection_id = ?1)",
+            params![id],
+        )
+        .map_err(db::map_err)?;
+        tx.execute(
+            "DELETE FROM results WHERE console_id IN \
+             (SELECT id FROM consoles WHERE connection_id = ?1)",
+            params![id],
+        )
+        .map_err(db::map_err)?;
+        tx.execute(
+            "DELETE FROM histories WHERE console_id IN \
+             (SELECT id FROM consoles WHERE connection_id = ?1)",
+            params![id],
+        )
+        .map_err(db::map_err)?;
+        tx.execute(
+            "DELETE FROM consoles WHERE connection_id = ?1",
+            params![id],
+        )
+        .map_err(db::map_err)?;
+        tx.execute("DELETE FROM connections WHERE id = ?1", params![id])
             .map_err(db::map_err)?;
+        tx.commit().map_err(db::map_err)?;
         Ok(())
     }
 

@@ -47,6 +47,7 @@ interface AppState {
   setConsoles: (list: Console[]) => void;
   addConsole: (c: Console) => void;
   removeConsole: (id: string) => void;
+  removeConsolesByConnection: (connectionId: string) => void;
   renameConsoleLocal: (id: string, name: string) => void;
   setConsoleDbLocal: (id: string, db: string | null) => void;
 
@@ -81,6 +82,26 @@ export const useAppState = create<AppState>((set) => ({
         state.activeConsoleId === id ? null : state.activeConsoleId;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { [id]: _dropped, ...consoleRuntime } = state.consoleRuntime;
+      return { consoles, activeConsoleId, consoleRuntime };
+    }),
+  removeConsolesByConnection: (connectionId) =>
+    set((state) => {
+      const dropped = new Set(
+        state.consoles
+          .filter((c) => c.connectionId === connectionId)
+          .map((c) => c.id),
+      );
+      if (dropped.size === 0) return state;
+      const consoles = state.consoles.filter((c) => !dropped.has(c.id));
+      const activeConsoleId =
+        state.activeConsoleId && dropped.has(state.activeConsoleId)
+          ? null
+          : state.activeConsoleId;
+      const consoleRuntime = Object.fromEntries(
+        Object.entries(state.consoleRuntime).filter(
+          ([cid]) => !dropped.has(cid),
+        ),
+      );
       return { consoles, activeConsoleId, consoleRuntime };
     }),
   renameConsoleLocal: (id, name) =>

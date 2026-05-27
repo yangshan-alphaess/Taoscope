@@ -57,24 +57,30 @@ export function ConfirmRoot() {
         if (!o) close(false);
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent className="max-w-sm gap-3 rounded-md p-4">
         {opts && (
           <>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{opts.title}</AlertDialogTitle>
+            <AlertDialogHeader className="space-y-1.5">
+              <AlertDialogTitle className="text-sm font-semibold">
+                {opts.title}
+              </AlertDialogTitle>
               {opts.description && (
-                <AlertDialogDescription>
+                <AlertDialogDescription className="text-xs leading-relaxed">
                   {opts.description}
                 </AlertDialogDescription>
               )}
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => close(false)}>
+            <AlertDialogFooter className="gap-1.5 sm:gap-1.5">
+              <AlertDialogCancel
+                onClick={() => close(false)}
+                className="mt-0 h-8 rounded px-3 text-xs"
+              >
                 {opts.cancelLabel ?? t("button.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => close(true)}
                 className={cn(
+                  "h-8 rounded px-3 text-xs",
                   opts.danger &&
                     "bg-destructive text-destructive-foreground hover:bg-destructive/90",
                 )}

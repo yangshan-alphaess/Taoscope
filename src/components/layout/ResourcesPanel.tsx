@@ -97,6 +97,9 @@ export function ResourcesPanel() {
   const setConnections = useAppState((s) => s.setConnections);
   const consoles = useAppState((s) => s.consoles);
   const setActiveConsole = useAppState((s) => s.setActiveConsole);
+  const removeConsolesByConnection = useAppState(
+    (s) => s.removeConsolesByConnection,
+  );
   const createConsole = useCreateConsole();
 
   // Double-click a database: reuse the existing console bound to that db if
@@ -296,15 +299,21 @@ export function ResourcesPanel() {
   }
 
   async function handleDeleteConnection(c: Connection) {
+    const consoleCount = consoles.filter(
+      (k) => k.connectionId === c.id,
+    ).length;
     const ok = await confirm({
       title: t("resources-panel.delete-confirm.title", { name: c.name }),
-      description: t("resources-panel.delete-confirm.description"),
+      description: t("resources-panel.delete-confirm.description", {
+        count: consoleCount,
+      }),
       confirmLabel: t("resources-panel.context-menu.delete"),
       danger: true,
     });
     if (!ok) return;
     try {
       await ds.deleteConnection(c.id);
+      removeConsolesByConnection(c.id);
       await refreshConnections();
       clearConnCache(c.id);
       toast.success(t("toast.deleted"));

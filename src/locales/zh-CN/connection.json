@@ -64,7 +64,8 @@
     "empty": "暂无连接。",
     "delete-confirm": {
       "title": "删除连接 \"{{name}}\"？",
-      "description": "绑定到此连接的控制台仍会保留，但将无法继续查询。"
+      "description_zero": "此连接下没有控制台，将被永久删除。",
+      "description_other": "将永久删除此连接及其 {{count}} 个控制台，连同这些控制台的草稿、结果与历史记录。"
     },
     "context-menu": {
       "edit": "编辑…",
