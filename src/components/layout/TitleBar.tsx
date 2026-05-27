@@ -67,8 +67,10 @@ export function TitleBar() {
         // h-7 (~28px) matches the native macOS titlebar height, so traffic
         // lights and our centered content share the same vertical midline.
         // Transparent: it sits on the gradient shell as part of the frame.
-        "flex h-7 shrink-0 items-center px-4 select-none",
-        isMac && "pl-20",
+        // macOS reserves left room for the native traffic lights; elsewhere
+        // the brand hugs the far-left edge.
+        "flex h-7 shrink-0 items-center pr-4 select-none",
+        isMac ? "pl-20" : "pl-3",
       )}
     >
       <div
@@ -81,6 +83,13 @@ export function TitleBar() {
           isMac && "mt-[4px]",
         )}
       >
+        <img
+          src="/app-icon.svg"
+          alt=""
+          aria-hidden
+          data-tauri-drag-region
+          className="h-4 w-4 shrink-0"
+        />
         <span className="text-sm font-medium leading-none">Taoscope</span>
       </div>
 

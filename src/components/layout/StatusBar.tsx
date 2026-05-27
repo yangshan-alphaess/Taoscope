@@ -49,9 +49,9 @@ export function StatusBar() {
   return (
     <footer className="text-muted-foreground flex h-6 shrink-0 items-center justify-between px-3 text-xs">
       <div className="flex items-center gap-2 font-mono">
-        <UpdaterStatus />
-        <span className="text-muted-foreground/40">·</span>
         <GithubLink />
+        <span className="text-muted-foreground/40">·</span>
+        <UpdaterStatus />
         <span className="text-muted-foreground/40">·</span>
         <LocaleToggle />
       </div>

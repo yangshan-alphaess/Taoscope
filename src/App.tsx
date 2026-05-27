@@ -54,7 +54,7 @@ function App() {
 
   return (
     <DataSourceProvider value={dataSource}>
-      <div className="bg-surface-0 flex h-screen w-screen flex-col overflow-hidden bg-gradient-to-b from-[hsl(220_8%_10.5%)] to-[hsl(220_9%_7.5%)]">
+      <div className="bg-surface-0 flex h-screen w-screen flex-col overflow-hidden bg-[radial-gradient(140%_140%_at_0%_0%,hsl(220_7%_16%)_0%,hsl(220_9%_10%)_45%,hsl(220_10%_7%)_100%)]">
         <TitleBar />
         <div className="flex min-h-0 flex-1 gap-1.5 px-1.5 pb-1.5">
           <ResizablePanelGroup

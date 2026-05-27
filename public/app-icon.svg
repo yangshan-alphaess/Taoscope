@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#0A1412"/>
+  <defs>
+    <path id="t" d="
+      M -130,-36
+      L  130,-36
+      A 36,36 0 0,1 130,36
+      L  114,36
+      A 78,78 0 0,0 36,114
+      L  36,125
+      A 36,36 0 0,1 -36,125
+      L -36,114
+      A 78,78 0 0,0 -114,36
+      L -130,36
+      A 36,36 0 0,1 -130,-36
+      Z"/>
+  </defs>
+  <g fill="#06D49A">
+    <use href="#t" transform="translate(512,183)"/>
+    <use href="#t" transform="translate(797,348) rotate(60)"/>
+    <use href="#t" transform="translate(797,676) rotate(120)"/>
+    <use href="#t" transform="translate(512,841) rotate(180)"/>
+    <use href="#t" transform="translate(227,676) rotate(-120)"/>
+    <use href="#t" transform="translate(227,348) rotate(-60)"/>
+    <circle cx="512" cy="512" r="100" fill="none" stroke="#06D49A" stroke-width="72"/>
+  </g>
+</svg>
