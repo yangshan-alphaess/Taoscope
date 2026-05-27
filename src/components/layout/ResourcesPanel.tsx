@@ -514,6 +514,21 @@ export function ResourcesPanel() {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(msg);
     }
+
+    // We cleared the column / child-table caches above; any node that is
+    // currently expanded would otherwise be stuck on "loading" until the user
+    // collapses and re-opens it (its load only fires on the open transition).
+    // Force-reload the expanded ones so a schema change shows immediately.
+    for (const k of expandedColumns) {
+      if (!k.startsWith(dropDbPrefix)) continue;
+      const [cId, d, table] = k.split("|");
+      if (cId && d && table) void loadColumns(cId, d, table, true);
+    }
+    for (const k of expandedChildren) {
+      if (!k.startsWith(dropDbPrefix)) continue;
+      const [cId, d, stable] = k.split("|");
+      if (cId && d && stable) void loadChildren(cId, d, stable, true);
+    }
   }
 
   async function toggleConn(c: Connection) {
@@ -596,10 +611,15 @@ export function ResourcesPanel() {
     if (!isOpen) void loadChildren(connId, db, stable);
   }
 
-  async function loadColumns(connId: string, db: string, table: string) {
+  async function loadColumns(
+    connId: string,
+    db: string,
+    table: string,
+    force = false,
+  ) {
     const key = `${connId}|${db}|${table}`;
     const existing = columnsByTable[key];
-    if (existing && existing !== "error") return;
+    if (!force && existing && existing !== "error") return;
     setColumnsByTable((prev) => ({ ...prev, [key]: "loading" }));
     try {
       const cols = await ds.describeTable(connId, db, table);
@@ -609,10 +629,16 @@ export function ResourcesPanel() {
     }
   }
 
-  async function loadChildren(connId: string, db: string, stable: string) {
+  async function loadChildren(
+    connId: string,
+    db: string,
+    stable: string,
+    force = false,
+  ) {
     const key = `${connId}|${db}|${stable}`;
     const existing = childrenByStable[key];
-    if (existing && !existing.error && existing.items.length > 0) return;
+    if (!force && existing && !existing.error && existing.items.length > 0)
+      return;
     setChildrenByStable((prev) => ({
       ...prev,
       [key]: {
