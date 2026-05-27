@@ -124,6 +124,36 @@ function DropdownActions({ actions }: { actions: MenuAction[] }) {
   );
 }
 
+// The hover "⋯" dropdown shared by every tree row, kept in lock-step with the
+// right-click menu by rendering the same MenuAction[].
+function TreeRowMenu({
+  name,
+  actions,
+}: {
+  name: string;
+  actions: MenuAction[];
+}) {
+  const { t } = useTranslation("connection");
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible data-[state=open]:visible focus-visible:visible"
+          aria-label={t("resources-panel.tooltip.actions-for", { name })}
+          title={t("resources-panel.tooltip.actions-for", { name })}
+        >
+          <MoreHorizontal className="h-3 w-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownActions actions={actions} />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function ContextActions({ actions }: { actions: MenuAction[] }) {
   return (
     <>
@@ -816,7 +846,7 @@ export function ResourcesPanel() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto py-1 text-xs">
+      <div className="flex-1 overflow-y-auto py-1 text-xs select-none">
         {connections.length === 0 ? (
           <p className="text-muted-foreground p-3">
             {t("resources-panel.empty")}
@@ -952,6 +982,12 @@ export function ResourcesPanel() {
                     onToggleColumns={toggleColumns}
                     onToggleChildren={toggleChildren}
                     onLoadMoreChildren={loadMoreChildren}
+                    onRefreshColumns={(connId, db, table) =>
+                      void loadColumns(connId, db, table, true)
+                    }
+                    onRefreshChildren={(connId, db, stable) =>
+                      void loadChildren(connId, db, stable, true)
+                    }
                     onOpenDesigner={openDesigner}
                     onDrop={handleDrop}
                   />
@@ -1011,6 +1047,8 @@ interface ConnectionBodyProps {
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMoreChildren: (connId: string, db: string, stable: string) => void;
+  onRefreshColumns: (connId: string, db: string, table: string) => void;
+  onRefreshChildren: (connId: string, db: string, stable: string) => void;
   onOpenDesigner: (args: OpenDesignerArgs) => void;
   onDrop: (args: DropArgs) => void;
 }
@@ -1036,6 +1074,8 @@ function ConnectionBody({
   onToggleColumns,
   onToggleChildren,
   onLoadMoreChildren,
+  onRefreshColumns,
+  onRefreshChildren,
   onOpenDesigner,
   onDrop,
 }: ConnectionBodyProps) {
@@ -1211,6 +1251,8 @@ function ConnectionBody({
                 onToggleColumns={onToggleColumns}
                 onToggleChildren={onToggleChildren}
                 onLoadMoreChildren={onLoadMoreChildren}
+                onRefreshColumns={onRefreshColumns}
+                onRefreshChildren={onRefreshChildren}
                 onOpenDesigner={onOpenDesigner}
                 onDrop={onDrop}
               />
@@ -1238,6 +1280,8 @@ interface DatabaseBodyProps {
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMoreChildren: (connId: string, db: string, stable: string) => void;
+  onRefreshColumns: (connId: string, db: string, table: string) => void;
+  onRefreshChildren: (connId: string, db: string, stable: string) => void;
   onOpenDesigner: (args: OpenDesignerArgs) => void;
   onDrop: (args: DropArgs) => void;
 }
@@ -1258,6 +1302,8 @@ function DatabaseBody({
   onToggleColumns,
   onToggleChildren,
   onLoadMoreChildren,
+  onRefreshColumns,
+  onRefreshChildren,
   onOpenDesigner,
   onDrop,
 }: DatabaseBodyProps) {
@@ -1290,69 +1336,71 @@ function DatabaseBody({
       {visibleStables.map((stb) => {
         const tblKey = `${connId}|${dbName}|${stb.name}`;
         const tblOpen = filterActive || expandedTables.has(tblKey);
+        const editArgs: OpenDesignerArgs = {
+          mode: "alter-stable",
+          connId,
+          db: dbName,
+          targetName: stb.name,
+        };
+        const stableActions: MenuAction[] = [
+          {
+            key: "edit-stable",
+            icon: <Pencil className="h-3.5 w-3.5" />,
+            label: tr("resources-panel.context-menu.edit-stable"),
+            onSelect: () => onOpenDesigner(editArgs),
+          },
+          {
+            key: "new-child",
+            icon: <FileText className="h-3.5 w-3.5" />,
+            label: tr("resources-panel.context-menu.new-child"),
+            onSelect: () =>
+              onOpenDesigner({
+                mode: "create-child",
+                connId,
+                db: dbName,
+                stableName: stb.name,
+              }),
+          },
+          {
+            key: "drop-stable",
+            separatorBefore: true,
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            label: tr("resources-panel.context-menu.drop-stable"),
+            danger: true,
+            onSelect: () =>
+              onDrop({ kind: "stable", connId, db: dbName, name: stb.name }),
+          },
+        ];
         return (
           <div key={stb.name}>
             <ContextMenu>
               <ContextMenuTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => onToggleTable(connId, dbName, stb.name)}
-                  className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-                >
-                  {tblOpen ? (
-                    <ChevronDown className="h-3 w-3 shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3 shrink-0" />
-                  )}
-                  <Layers className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 truncate" title={stb.name}>
-                    {highlight(stb.name, query)}
-                  </span>
-                  <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
-                    {tr("resources-panel.tree.stable-badge", {
-                      count: stb.childCount,
-                    })}
-                  </span>
-                </button>
+                <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
+                  <button
+                    type="button"
+                    onClick={() => onToggleTable(connId, dbName, stb.name)}
+                    className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+                  >
+                    {tblOpen ? (
+                      <ChevronDown className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 shrink-0" />
+                    )}
+                    <Layers className="h-3.5 w-3.5 shrink-0" />
+                    <span className="min-w-0 truncate" title={stb.name}>
+                      {highlight(stb.name, query)}
+                    </span>
+                    <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
+                      {tr("resources-panel.tree.stable-badge", {
+                        count: stb.childCount,
+                      })}
+                    </span>
+                  </button>
+                  <TreeRowMenu name={stb.name} actions={stableActions} />
+                </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onOpenDesigner({
-                      mode: "alter-stable",
-                      connId,
-                      db: dbName,
-                      targetName: stb.name,
-                    })
-                  }
-                >
-                  {tr("resources-panel.context-menu.edit-stable")}
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onOpenDesigner({
-                      mode: "create-child",
-                      connId,
-                      db: dbName,
-                      stableName: stb.name,
-                    })
-                  }
-                >
-                  {tr("resources-panel.context-menu.new-child")}
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onDrop({
-                      kind: "stable",
-                      connId,
-                      db: dbName,
-                      name: stb.name,
-                    })
-                  }
-                  className="text-destructive focus:text-destructive"
-                >
-                  {tr("resources-panel.context-menu.drop-stable")}
-                </ContextMenuItem>
+                <ContextActions actions={stableActions} />
               </ContextMenuContent>
             </ContextMenu>
             {tblOpen && (
@@ -1362,6 +1410,7 @@ function DatabaseBody({
                 tableName={stb.name}
                 isStable
                 childCount={stb.childCount}
+                editArgs={editArgs}
                 query={query}
                 filterActive={filterActive}
                 expandedColumns={expandedColumns}
@@ -1371,6 +1420,8 @@ function DatabaseBody({
                 onToggleColumns={onToggleColumns}
                 onToggleChildren={onToggleChildren}
                 onLoadMoreChildren={onLoadMoreChildren}
+                onRefreshColumns={onRefreshColumns}
+                onRefreshChildren={onRefreshChildren}
                 onOpenDesigner={onOpenDesigner}
                 onDrop={onDrop}
               />
@@ -1387,55 +1438,57 @@ function DatabaseBody({
       {visibleTables.map((tbl) => {
         const tblKey = `${connId}|${dbName}|${tbl.name}`;
         const tblOpen = filterActive || expandedTables.has(tblKey);
+        const editArgs: OpenDesignerArgs = {
+          mode: tbl.isChild ? "alter-child-tags" : "alter-table",
+          connId,
+          db: dbName,
+          targetName: tbl.name,
+          stableName: tbl.stableName,
+        };
+        const tableActions: MenuAction[] = [
+          {
+            key: "edit",
+            icon: <Pencil className="h-3.5 w-3.5" />,
+            label: tbl.isChild
+              ? tr("resources-panel.context-menu.edit-child-tags")
+              : tr("resources-panel.context-menu.edit-table"),
+            onSelect: () => onOpenDesigner(editArgs),
+          },
+          {
+            key: "drop-table",
+            separatorBefore: true,
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            label: tr("resources-panel.context-menu.drop-table"),
+            danger: true,
+            onSelect: () =>
+              onDrop({ kind: "table", connId, db: dbName, name: tbl.name }),
+          },
+        ];
         return (
           <div key={tbl.name}>
             <ContextMenu>
               <ContextMenuTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => onToggleTable(connId, dbName, tbl.name)}
-                  className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-                >
-                  {tblOpen ? (
-                    <ChevronDown className="h-3 w-3 shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3 shrink-0" />
-                  )}
-                  <FileText className="h-3.5 w-3.5 shrink-0" />
-                  <span className="min-w-0 truncate" title={tbl.name}>
-                    {highlight(tbl.name, query)}
-                  </span>
-                </button>
+                <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
+                  <button
+                    type="button"
+                    onClick={() => onToggleTable(connId, dbName, tbl.name)}
+                    className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+                  >
+                    {tblOpen ? (
+                      <ChevronDown className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 shrink-0" />
+                    )}
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                    <span className="min-w-0 truncate" title={tbl.name}>
+                      {highlight(tbl.name, query)}
+                    </span>
+                  </button>
+                  <TreeRowMenu name={tbl.name} actions={tableActions} />
+                </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onOpenDesigner({
-                      mode: tbl.isChild ? "alter-child-tags" : "alter-table",
-                      connId,
-                      db: dbName,
-                      targetName: tbl.name,
-                      stableName: tbl.stableName,
-                    })
-                  }
-                >
-                  {tbl.isChild
-                    ? tr("resources-panel.context-menu.edit-child-tags")
-                    : tr("resources-panel.context-menu.edit-table")}
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onDrop({
-                      kind: "table",
-                      connId,
-                      db: dbName,
-                      name: tbl.name,
-                    })
-                  }
-                  className="text-destructive focus:text-destructive"
-                >
-                  {tr("resources-panel.context-menu.drop-table")}
-                </ContextMenuItem>
+                <ContextActions actions={tableActions} />
               </ContextMenuContent>
             </ContextMenu>
             {tblOpen && (
@@ -1444,6 +1497,7 @@ function DatabaseBody({
                 dbName={dbName}
                 tableName={tbl.name}
                 isStable={false}
+                editArgs={editArgs}
                 query={query}
                 filterActive={filterActive}
                 expandedColumns={expandedColumns}
@@ -1453,6 +1507,8 @@ function DatabaseBody({
                 onToggleColumns={onToggleColumns}
                 onToggleChildren={onToggleChildren}
                 onLoadMoreChildren={onLoadMoreChildren}
+                onRefreshColumns={onRefreshColumns}
+                onRefreshChildren={onRefreshChildren}
                 onOpenDesigner={onOpenDesigner}
                 onDrop={onDrop}
               />
@@ -1475,6 +1531,7 @@ interface TableBodyProps {
   tableName: string;
   isStable: boolean;
   childCount?: number;
+  editArgs: OpenDesignerArgs;
   query: string;
   filterActive: boolean;
   expandedColumns: Set<string>;
@@ -1484,6 +1541,8 @@ interface TableBodyProps {
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMoreChildren: (connId: string, db: string, stable: string) => void;
+  onRefreshColumns: (connId: string, db: string, table: string) => void;
+  onRefreshChildren: (connId: string, db: string, stable: string) => void;
   onOpenDesigner: (args: OpenDesignerArgs) => void;
   onDrop: (args: DropArgs) => void;
 }
@@ -1494,6 +1553,7 @@ function TableBody({
   tableName,
   isStable,
   childCount,
+  editArgs,
   query,
   filterActive,
   expandedColumns,
@@ -1503,6 +1563,8 @@ function TableBody({
   onToggleColumns,
   onToggleChildren,
   onLoadMoreChildren,
+  onRefreshColumns,
+  onRefreshChildren,
   onOpenDesigner,
   onDrop,
 }: TableBodyProps) {
@@ -1510,43 +1572,117 @@ function TableBody({
   const key = `${connId}|${dbName}|${tableName}`;
   const colsOpen = filterActive || expandedColumns.has(key);
   const childrenOpen = filterActive || expandedChildren.has(key);
+
+  const columnsActions: MenuAction[] = [
+    {
+      key: "edit",
+      icon: <Pencil className="h-3.5 w-3.5" />,
+      label:
+        editArgs.mode === "alter-stable"
+          ? t("resources-panel.context-menu.edit-stable")
+          : editArgs.mode === "alter-child-tags"
+            ? t("resources-panel.context-menu.edit-child-tags")
+            : t("resources-panel.context-menu.edit-table"),
+      onSelect: () => onOpenDesigner(editArgs),
+    },
+    {
+      key: "refresh",
+      separatorBefore: true,
+      icon: <RefreshCw className="h-3.5 w-3.5" />,
+      label: t("resources-panel.context-menu.refresh"),
+      onSelect: () => onRefreshColumns(connId, dbName, tableName),
+    },
+  ];
+
+  const childrenActions: MenuAction[] = [
+    {
+      key: "new-child",
+      icon: <FileText className="h-3.5 w-3.5" />,
+      label: t("resources-panel.context-menu.new-child"),
+      onSelect: () =>
+        onOpenDesigner({
+          mode: "create-child",
+          connId,
+          db: dbName,
+          stableName: tableName,
+        }),
+    },
+    {
+      key: "refresh",
+      separatorBefore: true,
+      icon: <RefreshCw className="h-3.5 w-3.5" />,
+      label: t("resources-panel.context-menu.refresh"),
+      onSelect: () => onRefreshChildren(connId, dbName, tableName),
+    },
+  ];
+
   return (
     <div className="ml-3 pl-1">
-      <button
-        type="button"
-        onClick={() => onToggleColumns(connId, dbName, tableName)}
-        className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-      >
-        {colsOpen ? (
-          <ChevronDown className="h-3 w-3 shrink-0" />
-        ) : (
-          <ChevronRight className="h-3 w-3 shrink-0" />
-        )}
-        <span className="min-w-0 truncate">{t("resources-panel.tree.columns-tags")}</span>
-      </button>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
+            <button
+              type="button"
+              onClick={() => onToggleColumns(connId, dbName, tableName)}
+              className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+            >
+              {colsOpen ? (
+                <ChevronDown className="h-3 w-3 shrink-0" />
+              ) : (
+                <ChevronRight className="h-3 w-3 shrink-0" />
+              )}
+              <span className="min-w-0 truncate">
+                {t("resources-panel.tree.columns-tags")}
+              </span>
+            </button>
+            <TreeRowMenu
+              name={t("resources-panel.tree.columns-tags")}
+              actions={columnsActions}
+            />
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextActions actions={columnsActions} />
+        </ContextMenuContent>
+      </ContextMenu>
       {colsOpen && (
         <ColumnsList state={columnsByTable[key]} query={query} />
       )}
 
       {isStable && (
         <>
-          <button
-            type="button"
-            onClick={() => onToggleChildren(connId, dbName, tableName)}
-            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-          >
-            {childrenOpen ? (
-              <ChevronDown className="h-3 w-3 shrink-0" />
-            ) : (
-              <ChevronRight className="h-3 w-3 shrink-0" />
-            )}
-            <span className="min-w-0 truncate">{t("resources-panel.tree.child-tables")}</span>
-            {typeof childCount === "number" && (
-              <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
-                {childCount}
-              </span>
-            )}
-          </button>
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
+                <button
+                  type="button"
+                  onClick={() => onToggleChildren(connId, dbName, tableName)}
+                  className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
+                >
+                  {childrenOpen ? (
+                    <ChevronDown className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 shrink-0" />
+                  )}
+                  <span className="min-w-0 truncate">
+                    {t("resources-panel.tree.child-tables")}
+                  </span>
+                  {typeof childCount === "number" && (
+                    <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
+                      {childCount}
+                    </span>
+                  )}
+                </button>
+                <TreeRowMenu
+                  name={t("resources-panel.tree.child-tables")}
+                  actions={childrenActions}
+                />
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextActions actions={childrenActions} />
+            </ContextMenuContent>
+          </ContextMenu>
           {childrenOpen && (
             <ChildrenList
               state={childrenByStable[key]}
