@@ -17,10 +17,11 @@ use serde_json::Value as JsonValue;
 
 use crate::datasource::error::DataSourceError;
 use crate::datasource::sql_builder::{
-    build_count_child_tables_sql, build_count_normal_tables_sql, build_count_stables_sql,
-    build_describe_sql, build_list_child_tables_sql, build_list_normal_tables_sql,
-    cell_to_string, cell_to_u32, column_index, parse_columns, SQL_SERVER_VERSION,
-    SQL_SHOW_DATABASES, SQL_SHOW_STABLES, SYSTEM_DATABASES,
+    assemble_stables, build_count_child_tables_sql, build_count_normal_tables_sql,
+    build_count_stables_sql, build_describe_sql, build_list_child_tables_sql,
+    build_list_normal_tables_sql, cell_to_string, cell_to_u32, parse_columns, parse_databases,
+    parse_describe, parse_first_column_strings, parse_scalar_count, parse_stable_count_map,
+    parse_stable_names, SQL_SERVER_VERSION, SQL_SHOW_DATABASES, SQL_SHOW_STABLES,
 };
 use crate::datasource::types::{
     AuthMode, Column, Connection, Database, ListTablesOpts, Paged, QueryResult, STable, Table,
@@ -158,37 +159,8 @@ pub async fn test_connection(conn: &Connection) -> TestConnectionResult {
 
 pub async fn list_databases(conn: &Connection) -> Result<Vec<Database>, DataSourceError> {
     let resp = execute_sql(conn, None, SQL_SHOW_DATABASES).await?;
-
-    let name_idx = column_index(&resp.column_meta, "name");
-    let retention_idx = column_index(&resp.column_meta, "retention")
-        .or_else(|| column_index(&resp.column_meta, "retentions"));
-    let vgroups_idx = column_index(&resp.column_meta, "vgroups");
-    let precision_idx = column_index(&resp.column_meta, "precision");
-
-    let Some(name_idx) = name_idx else {
-        return Ok(vec![]);
-    };
-
-    let mut out: Vec<Database> = Vec::with_capacity(resp.data.len());
-    for row in &resp.data {
-        let Some(name) = row.get(name_idx).and_then(cell_to_string) else {
-            continue;
-        };
-        if SYSTEM_DATABASES.contains(&name.as_str()) {
-            continue;
-        }
-        out.push(Database {
-            name,
-            retention: retention_idx
-                .and_then(|i| row.get(i))
-                .and_then(cell_to_string),
-            vgroups: vgroups_idx.and_then(|i| row.get(i)).and_then(cell_to_u32),
-            precision: precision_idx
-                .and_then(|i| row.get(i))
-                .and_then(cell_to_string),
-        });
-    }
-    Ok(out)
+    let columns = parse_columns(&resp.column_meta);
+    Ok(parse_databases(&columns, &resp.data))
 }
 
 pub async fn list_stables(
@@ -199,50 +171,20 @@ pub async fn list_stables(
     // Route the SQL through the REST path /rest/sql/<db> so `SHOW STABLES`
     // resolves against the named db.
     let resp = execute_sql(conn, Some(db), SQL_SHOW_STABLES).await?;
-
-    let name_idx = column_index(&resp.column_meta, "stable_name")
-        .or_else(|| column_index(&resp.column_meta, "name"));
-
-    let Some(name_idx) = name_idx else {
-        return Ok(vec![]);
-    };
-
-    let mut names: Vec<String> = Vec::new();
-    for row in &resp.data {
-        if let Some(name) = row.get(name_idx).and_then(cell_to_string) {
-            names.push(name);
-        }
-    }
+    let columns = parse_columns(&resp.column_meta);
+    let names = parse_stable_names(&columns, &resp.data);
 
     // One follow-up query to fetch child counts grouped by stable.
     let count_sql = build_count_stables_sql(db);
-    let mut count_map: HashMap<String, u32> = HashMap::new();
-    if let Ok(count_resp) = execute_sql(conn, None, &count_sql).await {
-        let cn_idx = column_index(&count_resp.column_meta, "stable_name");
-        let cc_idx = column_index(&count_resp.column_meta, "c")
-            .or_else(|| column_index(&count_resp.column_meta, "count(*)"));
-        if let (Some(cn_idx), Some(cc_idx)) = (cn_idx, cc_idx) {
-            for row in &count_resp.data {
-                let name = row.get(cn_idx).and_then(cell_to_string);
-                let count = row.get(cc_idx).and_then(cell_to_u32);
-                if let (Some(name), Some(count)) = (name, count) {
-                    count_map.insert(name, count);
-                }
-            }
+    let counts = match execute_sql(conn, None, &count_sql).await {
+        Ok(count_resp) => {
+            let cols = parse_columns(&count_resp.column_meta);
+            parse_stable_count_map(&cols, &count_resp.data)
         }
-    }
+        Err(_) => HashMap::new(),
+    };
 
-    let mut out: Vec<STable> = Vec::with_capacity(names.len());
-    for name in names {
-        let child_count = *count_map.get(&name).unwrap_or(&0);
-        out.push(STable {
-            name,
-            columns: vec![],
-            tag_columns: vec![],
-            child_count,
-        });
-    }
-    Ok(out)
+    Ok(assemble_stables(names, &counts))
 }
 
 pub async fn list_tables(
@@ -275,26 +217,19 @@ pub async fn list_tables(
             offset,
         );
         let items_resp = execute_sql(conn, None, &items_sql).await?;
-        let mut items: Vec<Table> = Vec::with_capacity(items_resp.data.len());
-        for row in &items_resp.data {
-            if let Some(name) = row.first().and_then(cell_to_string) {
-                items.push(Table {
-                    name,
-                    is_child: true,
-                    stable_name: Some(stable.clone()),
-                });
-            }
-        }
+        let items: Vec<Table> = parse_first_column_strings(&items_resp.data)
+            .into_iter()
+            .map(|name| Table {
+                name,
+                is_child: true,
+                stable_name: Some(stable.clone()),
+            })
+            .collect();
 
         let count_sql =
             build_count_child_tables_sql(db, stable, opts.search.as_deref());
         let total = match execute_sql(conn, None, &count_sql).await {
-            Ok(resp) => resp
-                .data
-                .first()
-                .and_then(|row| row.first())
-                .and_then(cell_to_u32)
-                .unwrap_or(0),
+            Ok(resp) => parse_scalar_count(&resp.data).unwrap_or(0),
             Err(_) => items.len() as u32,
         };
 
@@ -314,25 +249,18 @@ pub async fn list_tables(
     let items_sql =
         build_list_normal_tables_sql(db, opts.search.as_deref(), page_size, offset);
     let items_resp = execute_sql(conn, None, &items_sql).await?;
-    let mut items: Vec<Table> = Vec::with_capacity(items_resp.data.len());
-    for row in &items_resp.data {
-        if let Some(name) = row.first().and_then(cell_to_string) {
-            items.push(Table {
-                name,
-                is_child: false,
-                stable_name: None,
-            });
-        }
-    }
+    let items: Vec<Table> = parse_first_column_strings(&items_resp.data)
+        .into_iter()
+        .map(|name| Table {
+            name,
+            is_child: false,
+            stable_name: None,
+        })
+        .collect();
 
     let count_sql = build_count_normal_tables_sql(db, opts.search.as_deref());
     let total = match execute_sql(conn, None, &count_sql).await {
-        Ok(resp) => resp
-            .data
-            .first()
-            .and_then(|row| row.first())
-            .and_then(cell_to_u32)
-            .unwrap_or(0),
+        Ok(resp) => parse_scalar_count(&resp.data).unwrap_or(0),
         Err(_) => items.len() as u32,
     };
 
@@ -351,46 +279,8 @@ pub async fn describe_table(
 ) -> Result<Vec<Column>, DataSourceError> {
     let sql = build_describe_sql(db, table);
     let resp = execute_sql(conn, None, &sql).await?;
-
-    let field_idx = column_index(&resp.column_meta, "field").unwrap_or(0);
-    let type_idx = column_index(&resp.column_meta, "type").unwrap_or(1);
-    let length_idx = column_index(&resp.column_meta, "length");
-    let note_idx = column_index(&resp.column_meta, "note");
-
-    let mut out: Vec<Column> = Vec::with_capacity(resp.data.len());
-    for (idx, row) in resp.data.iter().enumerate() {
-        let Some(name) = row.get(field_idx).and_then(cell_to_string) else {
-            continue;
-        };
-        let Some(data_type) = row.get(type_idx).and_then(cell_to_string) else {
-            continue;
-        };
-        let length = length_idx
-            .and_then(|i| row.get(i))
-            .and_then(cell_to_u32)
-            .filter(|n| *n > 0);
-        let note = note_idx.and_then(|i| row.get(i)).and_then(cell_to_string);
-        let is_tag_flag = note
-            .as_deref()
-            .map(|n| n.eq_ignore_ascii_case("TAG"))
-            .unwrap_or(false);
-        let is_tag = if is_tag_flag { Some(true) } else { None };
-        let is_primary_ts =
-            if idx == 0 && !is_tag_flag && data_type.eq_ignore_ascii_case("TIMESTAMP") {
-                Some(true)
-            } else {
-                None
-            };
-
-        out.push(Column {
-            name,
-            data_type,
-            length,
-            is_tag,
-            is_primary_ts,
-        });
-    }
-    Ok(out)
+    let columns = parse_columns(&resp.column_meta);
+    Ok(parse_describe(&columns, &resp.data))
 }
 
 pub async fn run_sql(

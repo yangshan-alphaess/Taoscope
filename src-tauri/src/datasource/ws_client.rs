@@ -21,9 +21,11 @@ use std::sync::Mutex;
 
 use crate::datasource::error::DataSourceError;
 use crate::datasource::sql_builder::{
-    build_count_child_tables_sql, build_count_normal_tables_sql, build_count_stables_sql,
-    build_describe_sql, build_list_child_tables_sql, build_list_normal_tables_sql,
-    SQL_SHOW_DATABASES, SQL_SHOW_STABLES, SYSTEM_DATABASES,
+    assemble_stables, build_count_child_tables_sql, build_count_normal_tables_sql,
+    build_count_stables_sql, build_describe_sql, build_list_child_tables_sql,
+    build_list_normal_tables_sql, parse_databases, parse_describe, parse_first_column_strings,
+    parse_scalar_count, parse_stable_count_map, parse_stable_names, SQL_SHOW_DATABASES,
+    SQL_SHOW_STABLES,
 };
 use crate::datasource::types::{
     AuthMode, Column, Connection, Database, ListTablesOpts, Paged, Protocol, QueryResult, STable,
@@ -246,34 +248,7 @@ pub async fn list_databases(conn: &Connection) -> Result<Vec<Database>, DataSour
     let taos = get_or_connect(conn).await?;
     let timeout_ms = effective_timeout(conn);
     let result = run(&taos, timeout_ms, None, SQL_SHOW_DATABASES).await?;
-    let name_idx = column_index(&result.columns, "name");
-    let retention_idx = column_index(&result.columns, "retention")
-        .or_else(|| column_index(&result.columns, "retentions"));
-    let vgroups_idx = column_index(&result.columns, "vgroups");
-    let precision_idx = column_index(&result.columns, "precision");
-
-    let Some(name_idx) = name_idx else {
-        return Ok(vec![]);
-    };
-
-    let mut out: Vec<Database> = Vec::with_capacity(result.rows.len());
-    for row in &result.rows {
-        let Some(name) = row.get(name_idx).and_then(cell_to_string) else {
-            continue;
-        };
-        if SYSTEM_DATABASES.contains(&name.as_str()) {
-            continue;
-        }
-        out.push(Database {
-            name,
-            retention: retention_idx.and_then(|i| row.get(i)).and_then(cell_to_string),
-            vgroups: vgroups_idx.and_then(|i| row.get(i)).and_then(cell_to_u32),
-            precision: precision_idx
-                .and_then(|i| row.get(i))
-                .and_then(cell_to_string),
-        });
-    }
-    Ok(out)
+    Ok(parse_databases(&result.columns, &result.rows))
 }
 
 pub async fn list_stables(
@@ -283,46 +258,15 @@ pub async fn list_stables(
     let taos = get_or_connect(conn).await?;
     let timeout_ms = effective_timeout(conn);
     let result = run(&taos, timeout_ms, Some(db), SQL_SHOW_STABLES).await?;
-    let name_idx = column_index(&result.columns, "stable_name")
-        .or_else(|| column_index(&result.columns, "name"));
-    let Some(name_idx) = name_idx else {
-        return Ok(vec![]);
-    };
-    let mut names: Vec<String> = Vec::new();
-    for row in &result.rows {
-        if let Some(name) = row.get(name_idx).and_then(cell_to_string) {
-            names.push(name);
-        }
-    }
+    let names = parse_stable_names(&result.columns, &result.rows);
 
     let count_sql = build_count_stables_sql(db);
-    let mut count_map: HashMap<String, u32> = HashMap::new();
-    if let Ok(count_resp) = run(&taos, timeout_ms, None, &count_sql).await {
-        let cn_idx = column_index(&count_resp.columns, "stable_name");
-        let cc_idx = column_index(&count_resp.columns, "c")
-            .or_else(|| column_index(&count_resp.columns, "count(*)"));
-        if let (Some(cn_idx), Some(cc_idx)) = (cn_idx, cc_idx) {
-            for row in &count_resp.rows {
-                let name = row.get(cn_idx).and_then(cell_to_string);
-                let count = row.get(cc_idx).and_then(cell_to_u32);
-                if let (Some(name), Some(count)) = (name, count) {
-                    count_map.insert(name, count);
-                }
-            }
-        }
-    }
+    let counts = match run(&taos, timeout_ms, None, &count_sql).await {
+        Ok(count_resp) => parse_stable_count_map(&count_resp.columns, &count_resp.rows),
+        Err(_) => HashMap::new(),
+    };
 
-    let mut out: Vec<STable> = Vec::with_capacity(names.len());
-    for name in names {
-        let child_count = *count_map.get(&name).unwrap_or(&0);
-        out.push(STable {
-            name,
-            columns: vec![],
-            tag_columns: vec![],
-            child_count,
-        });
-    }
-    Ok(out)
+    Ok(assemble_stables(names, &counts))
 }
 
 pub async fn list_tables(
@@ -349,25 +293,18 @@ pub async fn list_tables(
         let items_sql =
             build_list_child_tables_sql(db, stable, opts.search.as_deref(), page_size, offset);
         let items_resp = run(&taos, timeout_ms, None, &items_sql).await?;
-        let mut items: Vec<Table> = Vec::with_capacity(items_resp.rows.len());
-        for row in &items_resp.rows {
-            if let Some(name) = row.first().and_then(cell_to_string) {
-                items.push(Table {
-                    name,
-                    is_child: true,
-                    stable_name: Some(stable.clone()),
-                });
-            }
-        }
+        let items: Vec<Table> = parse_first_column_strings(&items_resp.rows)
+            .into_iter()
+            .map(|name| Table {
+                name,
+                is_child: true,
+                stable_name: Some(stable.clone()),
+            })
+            .collect();
         let count_sql =
             build_count_child_tables_sql(db, stable, opts.search.as_deref());
         let total = match run(&taos, timeout_ms, None, &count_sql).await {
-            Ok(resp) => resp
-                .rows
-                .first()
-                .and_then(|row| row.first())
-                .and_then(cell_to_u32)
-                .unwrap_or(0),
+            Ok(resp) => parse_scalar_count(&resp.rows).unwrap_or(0),
             Err(_) => items.len() as u32,
         };
         return Ok(Paged {
@@ -381,25 +318,18 @@ pub async fn list_tables(
     let items_sql =
         build_list_normal_tables_sql(db, opts.search.as_deref(), page_size, offset);
     let items_resp = run(&taos, timeout_ms, None, &items_sql).await?;
-    let mut items: Vec<Table> = Vec::with_capacity(items_resp.rows.len());
-    for row in &items_resp.rows {
-        if let Some(name) = row.first().and_then(cell_to_string) {
-            items.push(Table {
-                name,
-                is_child: false,
-                stable_name: None,
-            });
-        }
-    }
+    let items: Vec<Table> = parse_first_column_strings(&items_resp.rows)
+        .into_iter()
+        .map(|name| Table {
+            name,
+            is_child: false,
+            stable_name: None,
+        })
+        .collect();
 
     let count_sql = build_count_normal_tables_sql(db, opts.search.as_deref());
     let total = match run(&taos, timeout_ms, None, &count_sql).await {
-        Ok(resp) => resp
-            .rows
-            .first()
-            .and_then(|row| row.first())
-            .and_then(cell_to_u32)
-            .unwrap_or(0),
+        Ok(resp) => parse_scalar_count(&resp.rows).unwrap_or(0),
         Err(_) => items.len() as u32,
     };
     Ok(Paged {
@@ -419,45 +349,7 @@ pub async fn describe_table(
     let timeout_ms = effective_timeout(conn);
     let sql = build_describe_sql(db, table);
     let result = run(&taos, timeout_ms, None, &sql).await?;
-
-    let field_idx = column_index(&result.columns, "field").unwrap_or(0);
-    let type_idx = column_index(&result.columns, "type").unwrap_or(1);
-    let length_idx = column_index(&result.columns, "length");
-    let note_idx = column_index(&result.columns, "note");
-
-    let mut out: Vec<Column> = Vec::with_capacity(result.rows.len());
-    for (idx, row) in result.rows.iter().enumerate() {
-        let Some(name) = row.get(field_idx).and_then(cell_to_string) else {
-            continue;
-        };
-        let Some(data_type) = row.get(type_idx).and_then(cell_to_string) else {
-            continue;
-        };
-        let length = length_idx
-            .and_then(|i| row.get(i))
-            .and_then(cell_to_u32)
-            .filter(|n| *n > 0);
-        let note = note_idx.and_then(|i| row.get(i)).and_then(cell_to_string);
-        let is_tag_flag = note
-            .as_deref()
-            .map(|n| n.eq_ignore_ascii_case("TAG"))
-            .unwrap_or(false);
-        let is_tag = if is_tag_flag { Some(true) } else { None };
-        let is_primary_ts =
-            if idx == 0 && !is_tag_flag && data_type.eq_ignore_ascii_case("TIMESTAMP") {
-                Some(true)
-            } else {
-                None
-            };
-        out.push(Column {
-            name,
-            data_type,
-            length,
-            is_tag,
-            is_primary_ts,
-        });
-    }
-    Ok(out)
+    Ok(parse_describe(&result.columns, &result.rows))
 }
 
 pub async fn run_sql(
@@ -480,24 +372,3 @@ pub async fn run_sql(
     })
 }
 
-// ── Local helpers (operate on our `Column` shape, not column_meta tuples) ──
-
-fn column_index(columns: &[Column], name: &str) -> Option<usize> {
-    columns.iter().position(|c| c.name.eq_ignore_ascii_case(name))
-}
-
-fn cell_to_string(v: &JsonValue) -> Option<String> {
-    match v {
-        JsonValue::String(s) => Some(s.clone()),
-        JsonValue::Null => None,
-        other => Some(other.to_string()),
-    }
-}
-
-fn cell_to_u32(v: &JsonValue) -> Option<u32> {
-    match v {
-        JsonValue::Number(n) => n.as_u64().map(|x| x as u32),
-        JsonValue::String(s) => s.parse::<u32>().ok(),
-        _ => None,
-    }
-}

@@ -5,9 +5,11 @@
 // tuples through the same parser helpers — keeping the two clients
 // behaviourally identical.
 
+use std::collections::HashMap;
+
 use serde_json::Value as JsonValue;
 
-use crate::datasource::types::Column;
+use crate::datasource::types::{Column, Database, STable};
 
 pub const SYSTEM_DATABASES: &[&str] =
     &["information_schema", "performance_schema"];
@@ -140,15 +142,6 @@ pub fn parse_columns(column_meta: &[(String, String, u32)]) -> Vec<Column> {
         .collect()
 }
 
-pub fn column_index(
-    column_meta: &[(String, String, u32)],
-    name: &str,
-) -> Option<usize> {
-    column_meta
-        .iter()
-        .position(|(n, _, _)| n.eq_ignore_ascii_case(name))
-}
-
 pub fn cell_to_string(v: &JsonValue) -> Option<String> {
     match v {
         JsonValue::String(s) => Some(s.clone()),
@@ -163,4 +156,149 @@ pub fn cell_to_u32(v: &JsonValue) -> Option<u32> {
         JsonValue::String(s) => s.parse::<u32>().ok(),
         _ => None,
     }
+}
+
+// ── Normalized row → domain parsers ─────────────────────────────────────
+//
+// Both transports converge on `(columns: &[Column], rows: &[Vec<JsonValue>])`
+// after their respective fetch step (the HTTP client normalizes its
+// `column_meta` tuples via `parse_columns` first). These parsers contain the
+// single source of truth for turning TDengine result rows into our domain
+// types, so the http and ws clients stay behaviourally identical by
+// construction rather than by copy-paste.
+
+fn col_index(columns: &[Column], name: &str) -> Option<usize> {
+    columns.iter().position(|c| c.name.eq_ignore_ascii_case(name))
+}
+
+/// Parse `SHOW DATABASES` rows, skipping system databases.
+pub fn parse_databases(columns: &[Column], rows: &[Vec<JsonValue>]) -> Vec<Database> {
+    let Some(name_idx) = col_index(columns, "name") else {
+        return vec![];
+    };
+    let retention_idx = col_index(columns, "retention")
+        .or_else(|| col_index(columns, "retentions"));
+    let vgroups_idx = col_index(columns, "vgroups");
+    let precision_idx = col_index(columns, "precision");
+
+    let mut out: Vec<Database> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let Some(name) = row.get(name_idx).and_then(cell_to_string) else {
+            continue;
+        };
+        if SYSTEM_DATABASES.contains(&name.as_str()) {
+            continue;
+        }
+        out.push(Database {
+            name,
+            retention: retention_idx.and_then(|i| row.get(i)).and_then(cell_to_string),
+            vgroups: vgroups_idx.and_then(|i| row.get(i)).and_then(cell_to_u32),
+            precision: precision_idx.and_then(|i| row.get(i)).and_then(cell_to_string),
+        });
+    }
+    out
+}
+
+/// Parse `SHOW STABLES` rows into super-table names.
+pub fn parse_stable_names(columns: &[Column], rows: &[Vec<JsonValue>]) -> Vec<String> {
+    let Some(idx) =
+        col_index(columns, "stable_name").or_else(|| col_index(columns, "name"))
+    else {
+        return vec![];
+    };
+    rows.iter()
+        .filter_map(|r| r.get(idx).and_then(cell_to_string))
+        .collect()
+}
+
+/// Parse the `stable_name, COUNT(*)` child-count query into a lookup map.
+pub fn parse_stable_count_map(
+    columns: &[Column],
+    rows: &[Vec<JsonValue>],
+) -> HashMap<String, u32> {
+    let mut map = HashMap::new();
+    let cn = col_index(columns, "stable_name");
+    let cc = col_index(columns, "c").or_else(|| col_index(columns, "count(*)"));
+    if let (Some(cn), Some(cc)) = (cn, cc) {
+        for row in rows {
+            if let (Some(name), Some(count)) = (
+                row.get(cn).and_then(cell_to_string),
+                row.get(cc).and_then(cell_to_u32),
+            ) {
+                map.insert(name, count);
+            }
+        }
+    }
+    map
+}
+
+/// Combine super-table names with their child counts.
+pub fn assemble_stables(names: Vec<String>, counts: &HashMap<String, u32>) -> Vec<STable> {
+    names
+        .into_iter()
+        .map(|name| {
+            let child_count = *counts.get(&name).unwrap_or(&0);
+            STable {
+                name,
+                columns: vec![],
+                tag_columns: vec![],
+                child_count,
+            }
+        })
+        .collect()
+}
+
+/// First-column values (table name listings).
+pub fn parse_first_column_strings(rows: &[Vec<JsonValue>]) -> Vec<String> {
+    rows.iter()
+        .filter_map(|r| r.first().and_then(cell_to_string))
+        .collect()
+}
+
+/// First cell of the first row as a count (COUNT(*) queries).
+pub fn parse_scalar_count(rows: &[Vec<JsonValue>]) -> Option<u32> {
+    rows.first().and_then(|r| r.first()).and_then(cell_to_u32)
+}
+
+/// Parse `DESCRIBE` rows into columns, flagging tags and the primary timestamp.
+pub fn parse_describe(columns: &[Column], rows: &[Vec<JsonValue>]) -> Vec<Column> {
+    let field_idx = col_index(columns, "field").unwrap_or(0);
+    let type_idx = col_index(columns, "type").unwrap_or(1);
+    let length_idx = col_index(columns, "length");
+    let note_idx = col_index(columns, "note");
+
+    let mut out: Vec<Column> = Vec::with_capacity(rows.len());
+    for (idx, row) in rows.iter().enumerate() {
+        let Some(name) = row.get(field_idx).and_then(cell_to_string) else {
+            continue;
+        };
+        let Some(data_type) = row.get(type_idx).and_then(cell_to_string) else {
+            continue;
+        };
+        let length = length_idx
+            .and_then(|i| row.get(i))
+            .and_then(cell_to_u32)
+            .filter(|n| *n > 0);
+        let note = note_idx.and_then(|i| row.get(i)).and_then(cell_to_string);
+        let is_tag_flag = note
+            .as_deref()
+            .map(|n| n.eq_ignore_ascii_case("TAG"))
+            .unwrap_or(false);
+        let is_tag = if is_tag_flag { Some(true) } else { None };
+        let is_primary_ts =
+            if idx == 0 && !is_tag_flag && data_type.eq_ignore_ascii_case("TIMESTAMP") {
+                Some(true)
+            } else {
+                None
+            };
+
+        out.push(Column {
+            name,
+            data_type,
+            length,
+            is_tag,
+            is_primary_ts,
+        });
+    }
+    out
 }
