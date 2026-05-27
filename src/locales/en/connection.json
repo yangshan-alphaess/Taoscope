@@ -75,13 +75,26 @@
       "expand-all": "Expand all",
       "collapse-all": "Collapse all"
     },
+    "tooltip": {
+      "actions-for": "Actions for {{name}}",
+      "new-console-in": "New console in {{name}}",
+      "refresh-db": "Refresh {{name}}"
+    },
     "tree": {
       "loading": "Loading…",
-      "error": "Error",
+      "error": "Failed to load. Retry?",
+      "retry": "Retry",
       "no-databases": "No databases",
+      "no-tables": "No tables.",
+      "no-matches": "No matches.",
       "columns-tags": "Columns & tags",
       "child-tables": "Child tables",
-      "no-tables": "No tables"
+      "no-columns": "No columns.",
+      "no-child-tables": "No child tables.",
+      "failed-columns": "Failed to load columns.",
+      "disconnected": "Disconnected",
+      "stable-badge": "STable · {{count}}",
+      "load-more": "+ Load {{n}} more ({{remaining}} remaining)"
     }
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Minus, Square, X, Copy } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAppState } from "@/store/appState";
 import { isTauriRuntime } from "@/datasource/factory";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ async function runOnWindow(
 }
 
 export function TitleBar() {
+  const { t } = useTranslation("common");
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const consoles = useAppState((s) => s.consoles);
   const connections = useAppState((s) => s.connections);
@@ -89,7 +91,7 @@ export function TitleBar() {
         )}
       >
         <span className="text-muted-foreground text-xs leading-none">
-          conn:
+          {t("titlebar.conn-label")}
         </span>
         <span className="text-foreground font-mono text-xs leading-none">
           {currentConn ? currentConn.name : "—"}

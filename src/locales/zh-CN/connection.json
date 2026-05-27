@@ -75,13 +75,26 @@
       "expand-all": "展开全部",
       "collapse-all": "折叠全部"
     },
+    "tooltip": {
+      "actions-for": "{{name}} 的操作",
+      "new-console-in": "在 {{name}} 新建控制台",
+      "refresh-db": "刷新 {{name}}"
+    },
     "tree": {
       "loading": "加载中…",
-      "error": "错误",
+      "error": "加载失败，点击重试？",
+      "retry": "重试",
       "no-databases": "暂无数据库",
+      "no-tables": "暂无表。",
+      "no-matches": "无匹配项。",
       "columns-tags": "列与标签",
       "child-tables": "子表",
-      "no-tables": "暂无表"
+      "no-columns": "暂无列。",
+      "no-child-tables": "暂无子表。",
+      "failed-columns": "加载列失败。",
+      "disconnected": "未连接",
+      "stable-badge": "超级表 · {{count}}",
+      "load-more": "+ 再加载 {{n}} 个（剩余 {{remaining}}）"
     }
   }
 }

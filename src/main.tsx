@@ -6,9 +6,13 @@ import { applyAppMenu } from "@/lib/appMenu";
 import "@/index.css";
 
 function Splash() {
+  // i18n is already initialized (common preloaded) by the time this renders,
+  // so reading the string directly off the singleton is safe.
   return (
     <div className="flex h-screen w-screen items-center justify-center">
-      <div className="text-muted-foreground/60 text-xs">Loading…</div>
+      <div className="text-muted-foreground/60 text-xs">
+        {i18n.t("common:status.loading")}
+      </div>
     </div>
   );
 }

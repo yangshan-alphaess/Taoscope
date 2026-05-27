@@ -12,7 +12,7 @@ module.exports = {
     ecmaVersion: "latest",
     sourceType: "module",
   },
-  plugins: ["react-refresh"],
+  plugins: ["react-refresh", "i18next"],
   rules: {
     "react-refresh/only-export-components": [
       "warn",
@@ -21,6 +21,28 @@ module.exports = {
     "@typescript-eslint/no-unused-vars": [
       "warn",
       { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+    ],
+    // Catch any user-visible JSX text that bypasses i18n. Only validates plain
+    // text inside JSX markup (mode jsx-text-only); attribute coverage
+    // (title / placeholder / aria-label) was migrated by hand. The words list
+    // re-states the plugin defaults (ASCII punctuation, SCREAMING_CASE) and
+    // adds the symbol glyphs used as separators / status icons in the UI.
+    "i18next/no-literal-string": [
+      "error",
+      {
+        mode: "jsx-text-only",
+        words: {
+          exclude: [
+            "[0-9!-/:-@[-`{-~]+",
+            "[A-Z_-]+",
+            "[·—×✕✓⚠⏱↩⌘⇧]+",
+            // Brand name and URL scheme literals are not translatable copy.
+            "Taoscope",
+            "https?://",
+            "wss?://",
+          ],
+        },
+      },
     ],
   },
   overrides: [

@@ -24,5 +24,8 @@
   "locale-toggle": {
     "tooltip-to-zh": "切换到中文",
     "tooltip-to-en": "Switch to English"
+  },
+  "titlebar": {
+    "conn-label": "conn:"
   }
 }

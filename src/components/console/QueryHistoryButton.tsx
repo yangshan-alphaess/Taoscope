@@ -50,16 +50,16 @@ const HistoryTrigger = forwardRef<HTMLButtonElement, ToolbarTriggerProps>(
 
 function relativeTime(epoch: number, t: TFunction): string {
   const diffMs = Date.now() - epoch;
-  if (diffMs < 0) return t("history.rel.just-now");
+  if (diffMs < 0) return t("toolbar.history.rel.just-now");
   const sec = Math.floor(diffMs / 1000);
-  if (sec < 30) return t("history.rel.just-now");
-  if (sec < 60) return t("history.rel.seconds-ago", { n: sec });
+  if (sec < 30) return t("toolbar.history.rel.just-now");
+  if (sec < 60) return t("toolbar.history.rel.seconds-ago", { n: sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return t("history.rel.minutes-ago", { n: min });
+  if (min < 60) return t("toolbar.history.rel.minutes-ago", { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return t("history.rel.hours-ago", { n: hr });
+  if (hr < 24) return t("toolbar.history.rel.hours-ago", { n: hr });
   const day = Math.floor(hr / 24);
-  return t("history.rel.days-ago", { n: day });
+  return t("toolbar.history.rel.days-ago", { n: day });
 }
 
 export function QueryHistoryButton() {
@@ -103,11 +103,11 @@ export function QueryHistoryButton() {
         className="w-96 p-0"
       >
         <div className="border-border border-b px-3 py-1.5 text-xs font-medium">
-          {t("history.popover-title", { count: history.length })}
+          {t("toolbar.history.popover-title", { count: history.length })}
         </div>
         {history.length === 0 ? (
           <p className="text-muted-foreground/70 px-3 py-3 text-xs italic">
-            {t("history.empty")}
+            {t("toolbar.history.empty")}
           </p>
         ) : (
           <ul className="max-h-80 overflow-y-auto">
@@ -130,7 +130,7 @@ export function QueryHistoryButton() {
                       {relativeTime(entry.runAt, t)} · {entry.rowCount}{" "}
                       {tCommon("unit.rows")} · {entry.elapsedMs}
                       {tCommon("unit.ms")}
-                      {entry.truncated && t("history.row-meta-truncated")}
+                      {entry.truncated && t("toolbar.history.row-meta-truncated")}
                     </span>
                   </button>
                 </li>
@@ -144,7 +144,7 @@ export function QueryHistoryButton() {
             onClick={clearAll}
             className="text-destructive hover:bg-muted/40 border-border w-full border-t px-3 py-1.5 text-left text-xs"
           >
-            {t("history.clear")}
+            {t("toolbar.history.clear")}
           </button>
         )}
       </PopoverContent>

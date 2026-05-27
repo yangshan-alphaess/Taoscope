@@ -823,11 +823,12 @@ function ConnectionBody({
   onToggleChildren,
   onLoadMoreChildren,
 }: ConnectionBodyProps) {
+  const { t } = useTranslation("connection");
   if (conn.status === "offline") {
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground/70 px-3 py-1 text-[11px] italic">
-          Disconnected
+          {t("resources-panel.tree.disconnected")}
         </p>
       </div>
     );
@@ -838,7 +839,7 @@ function ConnectionBody({
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground px-3 py-1 text-[11px]">
-          Loading…
+          {t("resources-panel.tree.loading")}
         </p>
       </div>
     );
@@ -847,7 +848,7 @@ function ConnectionBody({
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground/70 px-3 py-1 text-[11px] italic">
-          No databases.
+          {t("resources-panel.tree.no-databases")}
         </p>
       </div>
     );
@@ -884,8 +885,12 @@ function ConnectionBody({
                       onCreateConsoleInDb(conn.id, db.name);
                     }}
                     className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible shrink-0 rounded-sm p-1 group-hover:visible"
-                    aria-label={`New console in ${db.name}`}
-                    title={`New console in ${db.name}`}
+                    aria-label={t("resources-panel.tooltip.new-console-in", {
+                      name: db.name,
+                    })}
+                    title={t("resources-panel.tooltip.new-console-in", {
+                      name: db.name,
+                    })}
                   >
                     <FilePlus className="h-3 w-3" />
                   </button>
@@ -896,8 +901,12 @@ function ConnectionBody({
                       onRefreshDb(conn.id, db.name);
                     }}
                     className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
-                    aria-label={`Refresh ${db.name}`}
-                    title={`Refresh ${db.name}`}
+                    aria-label={t("resources-panel.tooltip.refresh-db", {
+                      name: db.name,
+                    })}
+                    title={t("resources-panel.tooltip.refresh-db", {
+                      name: db.name,
+                    })}
                   >
                     <RefreshCw className="h-3 w-3" />
                   </button>
@@ -907,7 +916,7 @@ function ConnectionBody({
                 <ContextMenuItem
                   onSelect={() => onCreateConsoleInDb(conn.id, db.name)}
                 >
-                  New Console
+                  {t("resources-panel.context-menu.new-console")}
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
@@ -972,6 +981,7 @@ function DatabaseBody({
   onToggleChildren,
   onLoadMoreChildren,
 }: DatabaseBodyProps) {
+  const { t: tr } = useTranslation("connection");
   const dbKey = `${connId}|${dbName}`;
   const stbs = stablesByDb[dbKey];
   const tbls = tablesByDb[dbKey];
@@ -979,7 +989,7 @@ function DatabaseBody({
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground px-3 py-1 text-[11px]">
-          Loading…
+          {tr("resources-panel.tree.loading")}
         </p>
       </div>
     );
@@ -989,7 +999,9 @@ function DatabaseBody({
   if (stbs.length === 0 && tbls.length === 0) {
     return (
       <div className="ml-3 pl-1">
-        <p className="text-muted-foreground/70 px-3 py-1 italic">empty</p>
+        <p className="text-muted-foreground/70 px-3 py-1 italic">
+          {tr("resources-panel.tree.no-tables")}
+        </p>
       </div>
     );
   }
@@ -1015,7 +1027,9 @@ function DatabaseBody({
                 {highlight(stb.name, query)}
               </span>
               <span className="text-muted-foreground/70 ml-auto font-mono">
-                STable · {stb.childCount}
+                {tr("resources-panel.tree.stable-badge", {
+                  count: stb.childCount,
+                })}
               </span>
             </button>
             {tblOpen && (
@@ -1041,18 +1055,18 @@ function DatabaseBody({
       })}
       {visibleStables.length === 0 && stbs.length > 0 && (
         <p className="text-muted-foreground/70 px-3 py-1 italic">
-          No matches.
+          {tr("resources-panel.tree.no-matches")}
         </p>
       )}
 
-      {visibleTables.map((t) => {
-        const tblKey = `${connId}|${dbName}|${t.name}`;
+      {visibleTables.map((tbl) => {
+        const tblKey = `${connId}|${dbName}|${tbl.name}`;
         const tblOpen = filterActive || expandedTables.has(tblKey);
         return (
-          <div key={t.name}>
+          <div key={tbl.name}>
             <button
               type="button"
-              onClick={() => onToggleTable(connId, dbName, t.name)}
+              onClick={() => onToggleTable(connId, dbName, tbl.name)}
               className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
             >
               {tblOpen ? (
@@ -1061,15 +1075,15 @@ function DatabaseBody({
                 <ChevronRight className="h-3 w-3 shrink-0" />
               )}
               <FileText className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate" title={t.name}>
-                {highlight(t.name, query)}
+              <span className="truncate" title={tbl.name}>
+                {highlight(tbl.name, query)}
               </span>
             </button>
             {tblOpen && (
               <TableBody
                 connId={connId}
                 dbName={dbName}
-                tableName={t.name}
+                tableName={tbl.name}
                 isStable={false}
                 query={query}
                 filterActive={filterActive}
@@ -1087,7 +1101,7 @@ function DatabaseBody({
       })}
       {visibleTables.length === 0 && tbls.length > 0 && (
         <p className="text-muted-foreground/70 px-3 py-1 italic">
-          No matches.
+          {tr("resources-panel.tree.no-matches")}
         </p>
       )}
     </div>
@@ -1188,11 +1202,12 @@ function ColumnsList({
   state: ColumnsState | undefined;
   query: string;
 }) {
+  const { t: tr } = useTranslation("connection");
   if (!state || state === "loading") {
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground px-3 py-1 text-[11px]">
-          Loading…
+          {tr("resources-panel.tree.loading")}
         </p>
       </div>
     );
@@ -1201,7 +1216,7 @@ function ColumnsList({
     return (
       <div className="ml-3 pl-1">
         <p className="text-destructive px-3 py-1 text-[11px]">
-          Failed to load columns.
+          {tr("resources-panel.tree.failed-columns")}
         </p>
       </div>
     );
@@ -1210,7 +1225,7 @@ function ColumnsList({
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground/70 px-3 py-1 text-[11px] italic">
-          No columns.
+          {tr("resources-panel.tree.no-columns")}
         </p>
       </div>
     );
@@ -1266,7 +1281,7 @@ function ChildrenList({
           onClick={onLoadMore}
           className="text-muted-foreground hover:text-foreground mt-1 text-[11px] underline"
         >
-          Retry
+          {tr("resources-panel.tree.retry")}
         </button>
       </div>
     );
@@ -1275,7 +1290,7 @@ function ChildrenList({
     return (
       <div className="ml-3 pl-1">
         <p className="text-muted-foreground/70 px-3 py-1 text-[11px] italic">
-          No child tables.
+          {tr("resources-panel.tree.no-child-tables")}
         </p>
       </div>
     );
@@ -1307,7 +1322,10 @@ function ChildrenList({
           onClick={onLoadMore}
           className="text-muted-foreground hover:text-foreground hover:bg-muted/40 w-full px-3 py-1 text-left text-[11px]"
         >
-          + Load 50 more ({remaining} remaining)
+          {tr("resources-panel.tree.load-more", {
+            n: CHILD_PAGE_SIZE,
+            remaining,
+          })}
         </button>
       )}
     </div>
