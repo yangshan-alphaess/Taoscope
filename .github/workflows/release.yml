@@ -45,10 +45,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           # Match the local toolchain exactly. `version: 11` would resolve
           # to "latest 11.x" — pnpm 11.3 silently raised its Node floor to
@@ -58,7 +58,7 @@ jobs:
           version: 11.2.2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Node 22 LTS — current Active LTS, satisfies any future pnpm
           # minor bump that pulls in newer node: builtins.
