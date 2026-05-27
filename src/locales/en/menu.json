@@ -1,0 +1,29 @@
+{
+  "app": {
+    "about": "About Taoscope",
+    "services": "Services",
+    "hide": "Hide Taoscope",
+    "hide-others": "Hide Others",
+    "show-all": "Show All",
+    "quit": "Quit Taoscope"
+  },
+  "edit": {
+    "title": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "select-all": "Select All"
+  },
+  "view": {
+    "title": "View",
+    "fullscreen": "Toggle Full Screen"
+  },
+  "window": {
+    "title": "Window",
+    "minimize": "Minimize",
+    "zoom": "Zoom",
+    "close": "Close Window"
+  }
+}

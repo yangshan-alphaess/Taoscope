@@ -20,6 +20,7 @@ const NAMESPACES = [
   "result",
   "updater",
   "errors",
+  "menu",
 ] as const;
 
 export type Namespace = (typeof NAMESPACES)[number];
@@ -57,6 +58,8 @@ async function loadNamespace(
       return (await import("../locales/en/updater.json")).default;
     case "en:errors":
       return (await import("../locales/en/errors.json")).default;
+    case "en:menu":
+      return (await import("../locales/en/menu.json")).default;
     case "zh-CN:common":
       return (await import("../locales/zh-CN/common.json")).default;
     case "zh-CN:connection":
@@ -69,6 +72,8 @@ async function loadNamespace(
       return (await import("../locales/zh-CN/updater.json")).default;
     case "zh-CN:errors":
       return (await import("../locales/zh-CN/errors.json")).default;
+    case "zh-CN:menu":
+      return (await import("../locales/zh-CN/menu.json")).default;
     default:
       return {};
   }
