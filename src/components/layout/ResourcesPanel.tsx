@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -95,7 +95,22 @@ export function ResourcesPanel() {
   const ds = useDataSource();
   const connections = useAppState((s) => s.connections);
   const setConnections = useAppState((s) => s.setConnections);
+  const consoles = useAppState((s) => s.consoles);
+  const setActiveConsole = useAppState((s) => s.setActiveConsole);
   const createConsole = useCreateConsole();
+
+  // Double-click a database: reuse the existing console bound to that db if
+  // there is one, otherwise create and open a fresh one bound to it.
+  function openConsoleForDb(connId: string, db: string) {
+    const existing = consoles.find(
+      (c) => c.connectionId === connId && c.currentDb === db,
+    );
+    if (existing) {
+      setActiveConsole(existing.id);
+    } else {
+      void createConsole(connId, { db });
+    }
+  }
 
   const [query, setQuery] = useState("");
   const [dialogState, setDialogState] = useState<DialogState>({
@@ -689,6 +704,16 @@ export function ResourcesPanel() {
                           <DropdownMenuItem
                             disabled={isOffline}
                             onSelect={() => {
+                              void createConsole(c.id);
+                            }}
+                          >
+                            <FilePlus className="h-3.5 w-3.5" />
+                            {t("resources-panel.context-menu.new-console")}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            disabled={isOffline}
+                            onSelect={() => {
                               void handleRefreshConnection(c);
                             }}
                           >
@@ -752,6 +777,7 @@ export function ResourcesPanel() {
                     onCreateConsoleInDb={(connId, db) =>
                       void createConsole(connId, { db })
                     }
+                    onOpenConsoleForDb={openConsoleForDb}
                     onToggleTable={toggleTable}
                     onToggleColumns={toggleColumns}
                     onToggleChildren={toggleChildren}
@@ -795,6 +821,7 @@ interface ConnectionBodyProps {
   onToggleDb: (connId: string, db: string) => void;
   onRefreshDb: (connId: string, db: string) => void;
   onCreateConsoleInDb: (connId: string, db: string) => void;
+  onOpenConsoleForDb: (connId: string, db: string) => void;
   onToggleTable: (connId: string, db: string, table: string) => void;
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
@@ -817,12 +844,35 @@ function ConnectionBody({
   onToggleDb,
   onRefreshDb,
   onCreateConsoleInDb,
+  onOpenConsoleForDb,
   onToggleTable,
   onToggleColumns,
   onToggleChildren,
   onLoadMoreChildren,
 }: ConnectionBodyProps) {
   const { t } = useTranslation("connection");
+  // Disambiguate single- vs double-click on a database row: a single click
+  // expands the tree (after a short delay), while a double-click opens a
+  // console and must NOT toggle expansion. The pending single-click timer is
+  // cancelled when a double-click lands first.
+  const clickTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  function handleDbClick(db: string) {
+    if (clickTimers.current[db]) return;
+    clickTimers.current[db] = setTimeout(() => {
+      delete clickTimers.current[db];
+      onToggleDb(conn.id, db);
+    }, 220);
+  }
+
+  function handleDbDoubleClick(db: string) {
+    const timer = clickTimers.current[db];
+    if (timer) {
+      clearTimeout(timer);
+      delete clickTimers.current[db];
+    }
+    onOpenConsoleForDb(conn.id, db);
+  }
   if (conn.status === "offline") {
     return (
       <div className="ml-3 pl-1">
@@ -864,7 +914,8 @@ function ConnectionBody({
                 <div className="group text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center">
                   <button
                     type="button"
-                    onClick={() => onToggleDb(conn.id, db.name)}
+                    onClick={() => handleDbClick(db.name)}
+                    onDoubleClick={() => handleDbDoubleClick(db.name)}
                     className="flex min-w-0 flex-1 items-center gap-1 px-2 py-1 text-left"
                   >
                     {dbOpen ? (
