@@ -1,0 +1,67 @@
+{
+  "title": {
+    "create-database": "新建数据库",
+    "create-stable": "新建超级表 · {{db}}",
+    "create-table": "新建表 · {{db}}",
+    "create-child": "新建子表 · {{db}}",
+    "alter-stable": "编辑超级表 · {{name}}",
+    "alter-table": "编辑表 · {{name}}",
+    "alter-child-tags": "编辑 Tag 值 · {{name}}"
+  },
+  "field": {
+    "db-name": "数据库名",
+    "table-name": "表名",
+    "stable-name": "超级表名",
+    "child-name": "子表名",
+    "using-stable": "所属超级表"
+  },
+  "columns": {
+    "heading": "列",
+    "tags-heading": "Tag",
+    "col-name": "名称",
+    "col-type": "类型",
+    "col-length": "长度",
+    "col-tag": "Tag",
+    "add-column": "添加列",
+    "add-tag": "添加 Tag",
+    "remove": "删除",
+    "primary-locked": "主键时间戳（锁定）"
+  },
+  "tagvalues": {
+    "heading": "Tag 值",
+    "name": "Tag",
+    "type": "类型",
+    "value": "值"
+  },
+  "loading": "加载中…",
+  "preview": {
+    "label": "将执行的 SQL",
+    "placeholder": "-- 修正高亮项后可执行"
+  },
+  "button": {
+    "cancel": "取消",
+    "execute": "执行"
+  },
+  "error": {
+    "name-required": "名称不能为空",
+    "name-duplicate": "列名重复",
+    "name-invalid": "非法标识符",
+    "length-required": "{{type}} 必须填写长度",
+    "no-changes": "没有要应用的更改"
+  },
+  "toast": {
+    "created": "已创建",
+    "altered": "已应用",
+    "dropped": "已删除",
+    "alter-partial": "已应用 {{done}}/{{total}} 条。失败于：{{sql}} — {{err}}"
+  },
+  "drop-confirm": {
+    "database-title": "删除数据库 \"{{name}}\"？",
+    "database-description": "将永久删除该数据库及其所有表与数据。",
+    "stable-title": "删除超级表 \"{{name}}\"？",
+    "stable-description": "将永久删除该超级表及其所有子表与数据。",
+    "table-title": "删除表 \"{{name}}\"？",
+    "table-description": "将永久删除该表及其所有数据。",
+    "confirm": "删除"
+  }
+}

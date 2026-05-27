@@ -29,7 +29,12 @@ import type {
 } from "@/datasource/types";
 import { cn } from "@/lib/utils";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
+import { buildDrop, type DropKind } from "@/components/console/ddlBuilder";
 import { ConnectionFormDialog } from "@/components/layout/ConnectionFormDialog";
+import {
+  TableDesignerDialog,
+  type DesignerMode,
+} from "@/components/layout/TableDesignerDialog";
 import {
   loadPersistedExpansion,
   pruneByConnIds,
@@ -56,6 +61,30 @@ interface DialogState {
   open: boolean;
   mode: "create" | "edit";
   conn?: Connection;
+}
+
+interface DesignerState {
+  open: boolean;
+  mode: DesignerMode | null;
+  connId: string;
+  db: string;
+  targetName?: string;
+  stableName?: string;
+}
+
+export interface OpenDesignerArgs {
+  mode: DesignerMode;
+  connId: string;
+  db: string;
+  targetName?: string;
+  stableName?: string;
+}
+
+export interface DropArgs {
+  kind: DropKind;
+  connId: string;
+  db: string;
+  name: string;
 }
 
 type ColumnsState = Column[] | "loading" | "error";
@@ -92,6 +121,7 @@ function nameMatches(name: string, q: string): boolean {
 
 export function ResourcesPanel() {
   const { t } = useTranslation("connection");
+  const { t: td } = useTranslation("designer");
   const ds = useDataSource();
   const connections = useAppState((s) => s.connections);
   const setConnections = useAppState((s) => s.setConnections);
@@ -120,6 +150,52 @@ export function ResourcesPanel() {
     open: false,
     mode: "create",
   });
+  const [designer, setDesigner] = useState<DesignerState>({
+    open: false,
+    mode: null,
+    connId: "",
+    db: "",
+  });
+
+  function openDesigner(args: OpenDesignerArgs) {
+    setDesigner({ open: true, ...args });
+  }
+
+  function refreshAfterSchemaChange(connId: string, db: string) {
+    void handleRefreshDatabase(connId, db);
+  }
+
+  function handleDesignerSaved() {
+    if (designer.mode === "create-database") {
+      const c = connections.find((x) => x.id === designer.connId);
+      if (c) void handleRefreshConnection(c);
+    } else {
+      refreshAfterSchemaChange(designer.connId, designer.db);
+    }
+  }
+
+  async function handleDrop(args: DropArgs) {
+    const ok = await confirm({
+      title: td(`drop-confirm.${args.kind}-title`, { name: args.name }),
+      description: td(`drop-confirm.${args.kind}-description`),
+      confirmLabel: td("drop-confirm.confirm"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const db = args.kind === "database" ? null : args.db;
+      await ds.runSql(args.connId, db, buildDrop(args.kind, args.db, args.name));
+      toast.success(td("toast.dropped"));
+      if (args.kind === "database") {
+        const c = connections.find((x) => x.id === args.connId);
+        if (c) void handleRefreshConnection(c);
+      } else {
+        refreshAfterSchemaChange(args.connId, args.db);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   // Expansion sets keyed by path (lazy-initialized from localStorage).
   // conns: connId
@@ -764,6 +840,18 @@ export function ResourcesPanel() {
                     >
                       {t("resources-panel.context-menu.new-console")}
                     </ContextMenuItem>
+                    <ContextMenuItem
+                      disabled={isOffline}
+                      onSelect={() =>
+                        openDesigner({
+                          mode: "create-database",
+                          connId: c.id,
+                          db: "",
+                        })
+                      }
+                    >
+                      {t("resources-panel.context-menu.new-database")}
+                    </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
 
@@ -791,6 +879,8 @@ export function ResourcesPanel() {
                     onToggleColumns={toggleColumns}
                     onToggleChildren={toggleChildren}
                     onLoadMoreChildren={loadMoreChildren}
+                    onOpenDesigner={openDesigner}
+                    onDrop={handleDrop}
                   />
                 )}
               </div>
@@ -809,6 +899,17 @@ export function ResourcesPanel() {
         onSaved={() => {
           void refreshConnections();
         }}
+      />
+
+      <TableDesignerDialog
+        open={designer.open}
+        mode={designer.mode}
+        connId={designer.connId}
+        db={designer.db}
+        targetName={designer.targetName}
+        stableName={designer.stableName}
+        onOpenChange={(open) => setDesigner((s) => ({ ...s, open }))}
+        onSaved={handleDesignerSaved}
       />
     </section>
   );
@@ -835,6 +936,8 @@ interface ConnectionBodyProps {
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMoreChildren: (connId: string, db: string, stable: string) => void;
+  onOpenDesigner: (args: OpenDesignerArgs) => void;
+  onDrop: (args: DropArgs) => void;
 }
 
 function ConnectionBody({
@@ -858,6 +961,8 @@ function ConnectionBody({
   onToggleColumns,
   onToggleChildren,
   onLoadMoreChildren,
+  onOpenDesigner,
+  onDrop,
 }: ConnectionBodyProps) {
   const { t } = useTranslation("connection");
   // Disambiguate single- vs double-click on a database row: a single click
@@ -977,6 +1082,41 @@ function ConnectionBody({
                 >
                   {t("resources-panel.context-menu.new-console")}
                 </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onOpenDesigner({
+                      mode: "create-stable",
+                      connId: conn.id,
+                      db: db.name,
+                    })
+                  }
+                >
+                  {t("resources-panel.context-menu.new-stable")}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onOpenDesigner({
+                      mode: "create-table",
+                      connId: conn.id,
+                      db: db.name,
+                    })
+                  }
+                >
+                  {t("resources-panel.context-menu.new-table")}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onDrop({
+                      kind: "database",
+                      connId: conn.id,
+                      db: db.name,
+                      name: db.name,
+                    })
+                  }
+                  className="text-destructive focus:text-destructive"
+                >
+                  {t("resources-panel.context-menu.drop-database")}
+                </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
             {dbOpen && (
@@ -996,6 +1136,8 @@ function ConnectionBody({
                 onToggleColumns={onToggleColumns}
                 onToggleChildren={onToggleChildren}
                 onLoadMoreChildren={onLoadMoreChildren}
+                onOpenDesigner={onOpenDesigner}
+                onDrop={onDrop}
               />
             )}
           </div>
@@ -1021,6 +1163,8 @@ interface DatabaseBodyProps {
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMoreChildren: (connId: string, db: string, stable: string) => void;
+  onOpenDesigner: (args: OpenDesignerArgs) => void;
+  onDrop: (args: DropArgs) => void;
 }
 
 function DatabaseBody({
@@ -1039,6 +1183,8 @@ function DatabaseBody({
   onToggleColumns,
   onToggleChildren,
   onLoadMoreChildren,
+  onOpenDesigner,
+  onDrop,
 }: DatabaseBodyProps) {
   const { t: tr } = useTranslation("connection");
   const dbKey = `${connId}|${dbName}`;
@@ -1071,26 +1217,69 @@ function DatabaseBody({
         const tblOpen = filterActive || expandedTables.has(tblKey);
         return (
           <div key={stb.name}>
-            <button
-              type="button"
-              onClick={() => onToggleTable(connId, dbName, stb.name)}
-              className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-            >
-              {tblOpen ? (
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              ) : (
-                <ChevronRight className="h-3 w-3 shrink-0" />
-              )}
-              <Layers className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 truncate" title={stb.name}>
-                {highlight(stb.name, query)}
-              </span>
-              <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
-                {tr("resources-panel.tree.stable-badge", {
-                  count: stb.childCount,
-                })}
-              </span>
-            </button>
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onToggleTable(connId, dbName, stb.name)}
+                  className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
+                >
+                  {tblOpen ? (
+                    <ChevronDown className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 shrink-0" />
+                  )}
+                  <Layers className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate" title={stb.name}>
+                    {highlight(stb.name, query)}
+                  </span>
+                  <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
+                    {tr("resources-panel.tree.stable-badge", {
+                      count: stb.childCount,
+                    })}
+                  </span>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onOpenDesigner({
+                      mode: "alter-stable",
+                      connId,
+                      db: dbName,
+                      targetName: stb.name,
+                    })
+                  }
+                >
+                  {tr("resources-panel.context-menu.edit-stable")}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onOpenDesigner({
+                      mode: "create-child",
+                      connId,
+                      db: dbName,
+                      stableName: stb.name,
+                    })
+                  }
+                >
+                  {tr("resources-panel.context-menu.new-child")}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onDrop({
+                      kind: "stable",
+                      connId,
+                      db: dbName,
+                      name: stb.name,
+                    })
+                  }
+                  className="text-destructive focus:text-destructive"
+                >
+                  {tr("resources-panel.context-menu.drop-stable")}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
             {tblOpen && (
               <TableBody
                 connId={connId}
@@ -1107,6 +1296,8 @@ function DatabaseBody({
                 onToggleColumns={onToggleColumns}
                 onToggleChildren={onToggleChildren}
                 onLoadMoreChildren={onLoadMoreChildren}
+                onOpenDesigner={onOpenDesigner}
+                onDrop={onDrop}
               />
             )}
           </div>
@@ -1123,21 +1314,55 @@ function DatabaseBody({
         const tblOpen = filterActive || expandedTables.has(tblKey);
         return (
           <div key={tbl.name}>
-            <button
-              type="button"
-              onClick={() => onToggleTable(connId, dbName, tbl.name)}
-              className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
-            >
-              {tblOpen ? (
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              ) : (
-                <ChevronRight className="h-3 w-3 shrink-0" />
-              )}
-              <FileText className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 truncate" title={tbl.name}>
-                {highlight(tbl.name, query)}
-              </span>
-            </button>
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onToggleTable(connId, dbName, tbl.name)}
+                  className="text-muted-foreground hover:bg-muted/50 hover:text-foreground flex w-full items-center gap-1 px-2 py-1 text-left"
+                >
+                  {tblOpen ? (
+                    <ChevronDown className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 shrink-0" />
+                  )}
+                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate" title={tbl.name}>
+                    {highlight(tbl.name, query)}
+                  </span>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onOpenDesigner({
+                      mode: tbl.isChild ? "alter-child-tags" : "alter-table",
+                      connId,
+                      db: dbName,
+                      targetName: tbl.name,
+                      stableName: tbl.stableName,
+                    })
+                  }
+                >
+                  {tbl.isChild
+                    ? tr("resources-panel.context-menu.edit-child-tags")
+                    : tr("resources-panel.context-menu.edit-table")}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() =>
+                    onDrop({
+                      kind: "table",
+                      connId,
+                      db: dbName,
+                      name: tbl.name,
+                    })
+                  }
+                  className="text-destructive focus:text-destructive"
+                >
+                  {tr("resources-panel.context-menu.drop-table")}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
             {tblOpen && (
               <TableBody
                 connId={connId}
@@ -1153,6 +1378,8 @@ function DatabaseBody({
                 onToggleColumns={onToggleColumns}
                 onToggleChildren={onToggleChildren}
                 onLoadMoreChildren={onLoadMoreChildren}
+                onOpenDesigner={onOpenDesigner}
+                onDrop={onDrop}
               />
             )}
           </div>
@@ -1182,6 +1409,8 @@ interface TableBodyProps {
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
   onLoadMoreChildren: (connId: string, db: string, stable: string) => void;
+  onOpenDesigner: (args: OpenDesignerArgs) => void;
+  onDrop: (args: DropArgs) => void;
 }
 
 function TableBody({
@@ -1199,6 +1428,8 @@ function TableBody({
   onToggleColumns,
   onToggleChildren,
   onLoadMoreChildren,
+  onOpenDesigner,
+  onDrop,
 }: TableBodyProps) {
   const { t } = useTranslation("connection");
   const key = `${connId}|${dbName}|${tableName}`;
@@ -1245,7 +1476,12 @@ function TableBody({
             <ChildrenList
               state={childrenByStable[key]}
               query={query}
+              connId={connId}
+              dbName={dbName}
+              stableName={tableName}
               onLoadMore={() => onLoadMoreChildren(connId, dbName, tableName)}
+              onOpenDesigner={onOpenDesigner}
+              onDrop={onDrop}
             />
           )}
         </>
@@ -1315,11 +1551,21 @@ function ColumnsList({
 function ChildrenList({
   state,
   query,
+  connId,
+  dbName,
+  stableName,
   onLoadMore,
+  onOpenDesigner,
+  onDrop,
 }: {
   state: ChildLoadState | undefined;
   query: string;
+  connId: string;
+  dbName: string;
+  stableName: string;
   onLoadMore: () => void;
+  onOpenDesigner: (args: OpenDesignerArgs) => void;
+  onDrop: (args: DropArgs) => void;
 }) {
   const { t: tr } = useTranslation("connection");
   if (!state) {
@@ -1358,17 +1604,43 @@ function ChildrenList({
   return (
     <div className="ml-3 pl-1">
       {state.items.map((t) => (
-        <div
-          key={t.name}
-          className="text-muted-foreground flex w-full items-center gap-2 px-2 py-0.5"
-          title={t.name}
-        >
-          <span className="w-3 shrink-0" aria-hidden />
-          <FileText className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 truncate font-mono">
-            {highlight(t.name, query)}
-          </span>
-        </div>
+        <ContextMenu key={t.name}>
+          <ContextMenuTrigger asChild>
+            <div
+              className="text-muted-foreground flex w-full items-center gap-2 px-2 py-0.5"
+              title={t.name}
+            >
+              <span className="w-3 shrink-0" aria-hidden />
+              <FileText className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 truncate font-mono">
+                {highlight(t.name, query)}
+              </span>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              onSelect={() =>
+                onOpenDesigner({
+                  mode: "alter-child-tags",
+                  connId,
+                  db: dbName,
+                  targetName: t.name,
+                  stableName,
+                })
+              }
+            >
+              {tr("resources-panel.context-menu.edit-child-tags")}
+            </ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() =>
+                onDrop({ kind: "table", connId, db: dbName, name: t.name })
+              }
+              className="text-destructive focus:text-destructive"
+            >
+              {tr("resources-panel.context-menu.drop-table")}
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       ))}
       {state.loading && (
         <p className="text-muted-foreground px-3 py-1 text-[11px]">

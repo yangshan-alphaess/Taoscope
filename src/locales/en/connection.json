@@ -75,7 +75,17 @@
       "test": "Test connection",
       "new-console": "New Console",
       "expand-all": "Expand all",
-      "collapse-all": "Collapse all"
+      "collapse-all": "Collapse all",
+      "new-database": "New database…",
+      "new-stable": "New super table…",
+      "new-table": "New table…",
+      "new-child": "New child table…",
+      "edit-stable": "Edit columns & tags…",
+      "edit-table": "Edit columns…",
+      "edit-child-tags": "Edit tag values…",
+      "drop-database": "Drop database",
+      "drop-stable": "Drop super table",
+      "drop-table": "Drop table"
     },
     "tooltip": {
       "actions-for": "Actions for {{name}}",

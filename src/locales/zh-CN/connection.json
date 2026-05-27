@@ -74,7 +74,17 @@
       "test": "测试连接",
       "new-console": "新建控制台",
       "expand-all": "展开全部",
-      "collapse-all": "折叠全部"
+      "collapse-all": "折叠全部",
+      "new-database": "新建数据库…",
+      "new-stable": "新建超级表…",
+      "new-table": "新建表…",
+      "new-child": "新建子表…",
+      "edit-stable": "编辑列与 Tag…",
+      "edit-table": "编辑列…",
+      "edit-child-tags": "编辑 Tag 值…",
+      "drop-database": "删除数据库",
+      "drop-stable": "删除超级表",
+      "drop-table": "删除表"
     },
     "tooltip": {
       "actions-for": "{{name}} 的操作",

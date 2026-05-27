@@ -1,0 +1,67 @@
+{
+  "title": {
+    "create-database": "New database",
+    "create-stable": "New super table · {{db}}",
+    "create-table": "New table · {{db}}",
+    "create-child": "New child table · {{db}}",
+    "alter-stable": "Edit super table · {{name}}",
+    "alter-table": "Edit table · {{name}}",
+    "alter-child-tags": "Edit tag values · {{name}}"
+  },
+  "field": {
+    "db-name": "Database name",
+    "table-name": "Table name",
+    "stable-name": "Super table name",
+    "child-name": "Child table name",
+    "using-stable": "From super table"
+  },
+  "columns": {
+    "heading": "Columns",
+    "tags-heading": "Tags",
+    "col-name": "Name",
+    "col-type": "Type",
+    "col-length": "Length",
+    "col-tag": "Tag",
+    "add-column": "Add column",
+    "add-tag": "Add tag",
+    "remove": "Remove",
+    "primary-locked": "Primary timestamp (locked)"
+  },
+  "tagvalues": {
+    "heading": "Tag values",
+    "name": "Tag",
+    "type": "Type",
+    "value": "Value"
+  },
+  "loading": "Loading…",
+  "preview": {
+    "label": "SQL to run",
+    "placeholder": "-- Fix the highlighted fields to run"
+  },
+  "button": {
+    "cancel": "Cancel",
+    "execute": "Execute"
+  },
+  "error": {
+    "name-required": "Name is required",
+    "name-duplicate": "Duplicate column name",
+    "name-invalid": "Invalid identifier",
+    "length-required": "Length is required for {{type}}",
+    "no-changes": "No changes to apply"
+  },
+  "toast": {
+    "created": "Created",
+    "altered": "Applied",
+    "dropped": "Dropped",
+    "alter-partial": "Applied {{done}} of {{total}}. Failed at: {{sql}} — {{err}}"
+  },
+  "drop-confirm": {
+    "database-title": "Drop database \"{{name}}\"?",
+    "database-description": "This permanently deletes the database and all of its tables and data.",
+    "stable-title": "Drop super table \"{{name}}\"?",
+    "stable-description": "This permanently deletes the super table and ALL of its child tables and data.",
+    "table-title": "Drop table \"{{name}}\"?",
+    "table-description": "This permanently deletes the table and all of its data.",
+    "confirm": "Drop"
+  }
+}
