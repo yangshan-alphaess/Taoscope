@@ -26,12 +26,28 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        // Reposition the macOS traffic lights after the window is shown and on
+        // every resize. Setting `trafficLightPosition` statically in the config
+        // does not stick — macOS re-lays-out the buttons after display — so we
+        // rely on decorum's runtime positioner instead.
+        .plugin(tauri_plugin_decorum::init())
         .setup(|app| {
             let db_path = resolve_db_path(app.handle())?;
             let store = crate::datasource::state::Store::open(&db_path)
                 .expect("failed to open SQLite database");
             app.manage(std::sync::Mutex::new(store));
             app.manage(crate::datasource::inflight::InFlightRegistry::new());
+
+            // Vertically center the traffic lights in the 36px title bar. y≈16
+            // lands their center on the bar's midline; x is the left inset.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_decorum::WebviewWindowExt;
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.set_traffic_lights_inset(12.0, 16.0);
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

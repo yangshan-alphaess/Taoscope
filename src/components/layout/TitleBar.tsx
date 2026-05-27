@@ -74,10 +74,7 @@ export function TitleBar() {
         isMac ? "pl-20" : "pl-3",
       )}
     >
-      <div
-        data-tauri-drag-region
-        className={cn("flex items-center gap-2", isMac && "-mt-[4px]")}
-      >
+      <div data-tauri-drag-region className="flex items-center gap-2">
         <img
           src="/app-icon.svg"
           alt=""
@@ -90,10 +87,7 @@ export function TitleBar() {
 
       <div
         data-tauri-drag-region
-        className={cn(
-          "flex flex-1 items-center justify-center gap-2",
-          isMac && "-mt-[2px]",
-        )}
+        className="flex flex-1 items-center justify-center gap-2"
       >
         <span className="text-muted-foreground text-xs leading-none">
           {t("titlebar.conn-label")}
