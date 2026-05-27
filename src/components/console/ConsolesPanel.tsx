@@ -57,15 +57,15 @@ export function ConsolesPanel() {
   }
 
   return (
-    <section className="bg-background border-border/70 flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-[0_2px_8px_-2px_rgba(0,0,0,0.35),inset_0_1px_0_0_hsl(0_0%_100%/0.04)]">
-      <div className="border-border flex h-9 shrink-0 items-center border-b bg-gradient-to-b from-white/[0.03] to-transparent px-3">
-        <h2 className="text-xs font-semibold tracking-wide uppercase">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-background shadow-[0_2px_8px_-2px_rgba(0,0,0,0.35),inset_0_1px_0_0_hsl(0_0%_100%/0.04)]">
+      <div className="flex h-9 shrink-0 items-center border-b border-border bg-gradient-to-b from-white/[0.03] to-transparent px-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide">
           {t("consoles-panel.title")}
         </h2>
       </div>
       <div className="flex-1 overflow-y-auto py-1 text-xs">
         {connections.length === 0 ? (
-          <p className="text-muted-foreground p-3">
+          <p className="p-3 text-muted-foreground">
             {t("consoles-panel.no-connections")}
           </p>
         ) : (
@@ -81,7 +81,7 @@ export function ConsolesPanel() {
                       type="button"
                       onClick={() => toggleCollapse(conn.id)}
                       className={cn(
-                        "hover:bg-muted/40 flex w-full items-center gap-1 px-2 py-1 text-left",
+                        "mx-1 flex items-center gap-1 rounded-md px-2 py-1 text-left hover:bg-muted/40",
                         isOffline && "text-muted-foreground/70",
                       )}
                     >
@@ -99,7 +99,7 @@ export function ConsolesPanel() {
                       />
                       <span className="truncate font-medium">{conn.name}</span>
                       {group.length > 0 && (
-                        <span className="text-muted-foreground/70 ml-auto font-mono">
+                        <span className="ml-auto font-mono text-muted-foreground/70">
                           ({group.length})
                         </span>
                       )}
@@ -114,7 +114,7 @@ export function ConsolesPanel() {
                     >
                       {t("consoles-panel.menu.new")}
                       {isOffline && (
-                        <span className="text-muted-foreground ml-2 text-xs">
+                        <span className="ml-2 text-xs text-muted-foreground">
                           {t("consoles-panel.menu.offline-suffix")}
                         </span>
                       )}
@@ -123,9 +123,9 @@ export function ConsolesPanel() {
                 </ContextMenu>
 
                 {isOpen && (
-                  <div className="ml-3">
+                  <div>
                     {group.length === 0 ? (
-                      <p className="text-muted-foreground/60 px-3 py-1 italic">
+                      <p className="px-3 py-1 italic text-muted-foreground/60">
                         {t("consoles-panel.no-consoles")}
                       </p>
                     ) : (
@@ -138,11 +138,12 @@ export function ConsolesPanel() {
                                 onClick={() => {
                                   if (!isActive) setActiveConsole(c.id);
                                 }}
+                                style={{ paddingLeft: 24 }}
                                 className={cn(
-                                  "group hover:bg-muted/40 flex cursor-pointer items-center gap-2 border-l-2 px-2 py-1",
+                                  "group mx-1 flex cursor-pointer items-center gap-2 rounded-md py-1 pr-2",
                                   isActive
-                                    ? "border-l-primary text-foreground bg-muted/60 font-medium"
-                                    : "border-l-transparent text-muted-foreground",
+                                    ? "bg-accent font-medium text-foreground"
+                                    : "text-muted-foreground hover:bg-muted/40",
                                 )}
                               >
                                 <span
@@ -162,11 +163,9 @@ export function ConsolesPanel() {
                                       setRenamingId(null);
                                     }
                                   }}
-                                  onRename={(next) =>
-                                    handleRename(c.id, next)
-                                  }
+                                  onRename={(next) => handleRename(c.id, next)}
                                 />
-                                <span className="text-muted-foreground/60 ml-auto font-mono text-[10px]">
+                                <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">
                                   {c.currentDb ?? "—"}
                                 </span>
                                 <button
@@ -175,8 +174,10 @@ export function ConsolesPanel() {
                                     e.stopPropagation();
                                     setRenamingId(c.id);
                                   }}
-                                  className="hover:bg-muted ml-1 rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                                  aria-label={t("consoles-panel.rename-tooltip")}
+                                  className="ml-1 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                  aria-label={t(
+                                    "consoles-panel.rename-tooltip",
+                                  )}
                                   title={t("consoles-panel.rename-tooltip")}
                                 >
                                   <Pencil className="h-3 w-3" />
@@ -187,8 +188,10 @@ export function ConsolesPanel() {
                                     e.stopPropagation();
                                     void handleDelete(c.id);
                                   }}
-                                  className="hover:bg-muted rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                                  aria-label={t("consoles-panel.delete-tooltip")}
+                                  className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                  aria-label={t(
+                                    "consoles-panel.delete-tooltip",
+                                  )}
                                   title={t("consoles-panel.delete-tooltip")}
                                 >
                                   <X className="h-3 w-3" />
@@ -208,7 +211,7 @@ export function ConsolesPanel() {
                                 className="text-destructive focus:text-destructive"
                               >
                                 {t("consoles-panel.menu.delete")}
-                                <span className="text-muted-foreground ml-auto pl-3 text-xs">
+                                <span className="ml-auto pl-3 text-xs text-muted-foreground">
                                   {fmtShortcut(["Mod", "W"])}
                                 </span>
                               </ContextMenuItem>
