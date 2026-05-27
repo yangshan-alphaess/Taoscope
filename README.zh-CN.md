@@ -14,10 +14,10 @@
 
 ### 连接与资源
 
-- **多连接工作区** —— 并列管理多个 TDengine 集群；在线/离线状态提示；每个连接独立刷新。
-- **OS 钥匙串凭据保险箱** —— 密码绝不以明文落盘；macOS Keychain / Windows Credential Manager / Linux Secret Service。
-- **树形资源面板** —— Connection → Database → STable / Table → 内联展开 **Columns & tags** 与 **Child tables**。无弹窗，展开状态跨重启保留。
-- **带 TTL 的 schema 缓存** —— 每次输入触发补全也不会反复打后端。
+- **多连接工作区** —— 并列管理多个 TDengine 集群；在线/离线状态提示；每个连接独立刷新。支持 **HTTP REST 或原生 WebSocket** 传输、**Basic 或 token** 认证、可选 TLS（含跳过证书校验的逃生口）。
+- **可视化表设计器** —— 在树上右键即可新建数据库 / 超级表 / 普通表 / 子表，编辑列与 tag，或删除对象；表单下方实时预览将执行的 SQL，确认后再运行。
+- **树形资源面板** —— Connection → Database → STable / Table → 内联展开 **Columns & tags** 与 **Child tables**，每个节点都有统一的 `⋯` / 右键操作菜单。删除连接会级联清除其下控制台与保存状态。展开状态跨重启保留。
+- **schema 缓存** —— 每次输入触发补全也不会反复打后端。
 
 ### SQL 控制台
 
@@ -25,8 +25,10 @@
 - **CodeMirror 编辑器** —— TDengine 定制方言（精简关键字集，没有 MySQL 那一堆冗余），语法高亮、行号，13 px 等宽 UI 字体。
 - **Schema-aware 自动补全** —— 解析当前语句的 `FROM` 子句，**只**给出那张表的列 + tag；无法识别时静默退回到关键字。
 - **运行模式** —— 选区 / 光标处语句 / 整个 scratch，统一 `⌘↵`。
+- **读 + 写 + DDL** —— `SELECT`、`INSERT`、`CREATE` / `ALTER` / `DROP`、`DELETE`、`SHOW`、`DESCRIBE` 都能跑；写/DDL 语句返回「影响 N 行」，`DROP` / `DELETE` 执行前二次确认。
+- **EXPLAIN** 光标处语句；**取消**长查询；**per-connection 超时**。
 - **格式化、注释切换、复制行向下、历史导航** —— 快捷键与 JetBrains / VS Code 一致。
-- **行数封顶** —— 防止 `SELECT *` 意外拉百万行；一键"显示全部"放开。
+- **行数封顶** —— 防止 `SELECT *` 意外拉百万行；一键"显示全部"放开（仅对 `SELECT` 注入上限，其它语句原样执行）。
 
 ### 查询结果
 
@@ -38,8 +40,9 @@
 
 ### 应用外壳
 
-- **自绘 TitleBar**：在 macOS 上文字与原生红绿灯中线对齐；Win/Linux 下提供最小化 / 最大化 / 关闭。
-- **紧凑暗色主题**：Linear / Vercel 风格调色板，TDengine 绿（`#06A77D`）作为主色。
+- **自绘 TitleBar**：macOS 原生红绿灯；Win/Linux 下提供最小化 / 最大化 / 关闭。
+- **紧凑暗色主题**：Linear / Vercel 风格调色板，TDengine 绿（`#06A77D`）作为主色；固定 `color-scheme`，原生控件在浅色 / 深色系统下渲染一致。
+- **English / 中文** 界面切换。
 - **右键菜单全局统一字号密度**。
 
 ### 自动更新
@@ -85,8 +88,8 @@ xattr -dr com.apple.quarantine /Applications/Taoscope.app
 | 编辑器 | CodeMirror 6 + `@codemirror/lang-sql`（自定义 TDengine 方言） |
 | 表格 | TanStack Table + TanStack Virtual |
 | 状态 | Zustand |
-| 存储 | SQLite（rusqlite）放 workspace；OS keychain（`keyring` crate）放密钥 |
-| 网络 | reqwest 走 TDengine REST `/rest/sql/<db>` |
+| 存储 | SQLite（rusqlite）—— workspace + 连接记录 |
+| 网络 | reqwest 走 TDengine REST `/rest/sql/<db>`，或 `taos` crate 走 WebSocket |
 | 包管理 | pnpm |
 
 ## 前置要求
@@ -150,7 +153,7 @@ git push --follow-tags origin main   # main + 新 tag 一次推完 → CI 起跑
 ├── src-tauri/
 │   ├── src/
 │   │   ├── commands.rs    # Tauri 命令边界
-│   │   ├── datasource/    # SQLite store + http_client（REST/TDengine）+ vault
+│   │   ├── datasource/    # SQLite store + http_client（REST）+ ws_client（WebSocket）+ 共享 sql_builder
 │   │   └── lib.rs
 │   └── tauri.conf.json
 ├── scripts/bump-version.mjs
@@ -160,7 +163,7 @@ git push --follow-tags origin main   # main + 新 tag 一次推完 → CI 起跑
 
 ## 状态
 
-- **1.0.0**：首个稳定切片。Phase 1（mock 数据源、UI 壳）+ Phase 2（Tauri 后端、真实 TDengine 查询、持久化、OS keychain 保险箱）全部闭环；自动更新通道已上线。
+- **1.2.x**：读 + 写/DDL 执行、可视化表设计器、WebSocket 传输、token 认证、TLS、查询取消/超时、EXPLAIN、中英文界面均已就位。连接记录（含密钥）存放在本地 SQLite workspace 文件——早期的 OS keychain 保险箱试用后已回退（dev 模式签名摩擦）；编辑对话框留空密码表示「保留原值」，密钥不回传 UI。
 - **代码签名证书暂未配置** —— macOS / Windows 首次启动的一次性绕过步骤见上方[安装使用](#安装使用)章节。应用内 updater 处理后续所有版本的就地升级，不会再触发同样的提示。
 
 长尾增强候选（TLS、查询取消、WS 协议等）见 [FEATURES.md](FEATURES.md)。

@@ -14,10 +14,10 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
 
 ### Connections & resources
 
-- **Multi-connection workspace** — manage many TDengine clusters side by side, online/offline indicators, per-connection refresh.
-- **OS-keychain credential vault** — passwords never live as plaintext on disk; macOS Keychain / Windows Credential Manager / Secret Service on Linux.
-- **Tree-style resources panel** — Connection → Database → STable / Table → inline **Columns & tags** + **Child tables**. No popups, expansion state persists across reloads.
-- **Schema cache with TTL** — keystroke-driven completions don't hammer the backend.
+- **Multi-connection workspace** — manage many TDengine clusters side by side, online/offline indicators, per-connection refresh. **HTTP REST or native WebSocket** transport, **Basic or token** auth, optional TLS (with allow-invalid-certs escape hatch).
+- **Visual table designer** — right-click in the tree to create databases / super tables / tables / child tables, edit columns & tags, or drop objects; the exact SQL is previewed live below the form before you run it.
+- **Tree-style resources panel** — Connection → Database → STable / Table → inline **Columns & tags** + **Child tables**, each with a unified `⋯` / right-click action menu. Deleting a connection cascades to its consoles + saved state. Expansion state persists across reloads.
+- **Schema cache** — keystroke-driven completions don't hammer the backend.
 
 ### SQL console
 
@@ -25,8 +25,10 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
 - **CodeMirror editor** with a TDengine-tuned dialect (small keyword set, no MySQL bloat), syntax highlighting, line numbers, mono-spaced 13 px UI font.
 - **Schema-aware autocomplete** that understands the active statement's `FROM` clause and surfaces only that table's columns + tags. Falls back silently when it can't.
 - **Run modes** — selection / statement-at-cursor / full scratch, all on `⌘↵`.
+- **Reads, writes & DDL** — `SELECT`, `INSERT`, `CREATE` / `ALTER` / `DROP`, `DELETE`, `SHOW`, `DESCRIBE` all run; write/DDL statements report "affected N rows" and `DROP` / `DELETE` ask for confirmation first.
+- **EXPLAIN** the statement at cursor; **cancel** a long-running query; **per-connection timeout**.
 - **Format**, **toggle-comment**, **copy-line-down**, history navigation — same shortcuts as JetBrains / VS Code.
-- **Row cap** with one-click "show all" — large `SELECT *` queries can't accidentally fetch a million rows.
+- **Row cap** with one-click "show all" — large `SELECT *` queries can't accidentally fetch a million rows (injected for `SELECT` only, so other statements run verbatim).
 
 ### Results
 
@@ -38,8 +40,9 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
 
 ### App shell
 
-- **Custom title bar** that aligns text to native macOS traffic-light height; minimize / maximize / close on Win + Linux.
-- **Compact dark theme** with a Linear/Vercel-ish palette, TDengine green (`#06A77D`) as the accent.
+- **Custom title bar** with native macOS traffic lights; minimize / maximize / close on Win + Linux.
+- **Compact dark theme** with a Linear/Vercel-ish palette, TDengine green (`#06A77D`) as the accent; `color-scheme` pinned so native controls render identically on Light- and Dark-mode machines.
+- **English / 中文** UI toggle.
 - **Right-click context menus everywhere** with the same typography density.
 
 ### Auto-update
@@ -85,8 +88,8 @@ That strips the `com.apple.quarantine` extended attribute Gatekeeper checks for.
 | Editor   | CodeMirror 6 + `@codemirror/lang-sql` (custom TDengine dialect) |
 | Grid     | TanStack Table + TanStack Virtual |
 | State    | Zustand |
-| Storage  | SQLite (rusqlite) for workspace; OS keychain (`keyring` crate) for secrets |
-| Network  | reqwest over TDengine REST `/rest/sql/<db>` |
+| Storage  | SQLite (rusqlite) — workspace + connection records |
+| Network  | reqwest over TDengine REST `/rest/sql/<db>`, or the `taos` crate over WebSocket |
 | Pkg mgr  | pnpm |
 
 ## Prerequisites
@@ -150,7 +153,7 @@ git push --follow-tags origin main   # main + tag in one shot → CI fires
 ├── src-tauri/
 │   ├── src/
 │   │   ├── commands.rs    # Tauri command boundary
-│   │   ├── datasource/    # SQLite store + http_client (REST/TDengine) + vault
+│   │   ├── datasource/    # SQLite store + http_client (REST) + ws_client (WebSocket) + shared sql_builder
 │   │   └── lib.rs
 │   └── tauri.conf.json
 ├── scripts/bump-version.mjs
@@ -160,7 +163,7 @@ git push --follow-tags origin main   # main + tag in one shot → CI fires
 
 ## Status
 
-- **1.0.0**: first stable cut. Phase 1 (mock data source, UI shell) + Phase 2 (Tauri backend, real TDengine queries, persistence, OS-keychain vault) closed; auto-update channel live.
+- **1.2.x**: read + write/DDL execution, the visual table designer, WebSocket transport, token auth, TLS, query cancel/timeout, EXPLAIN, and English/中文 UI are all in. Connection records (including secrets) live in the local SQLite workspace file — the earlier OS-keychain vault was tried and reverted (dev-mode signing friction); a blank password in the edit dialog means "keep current" so secrets never round-trip to the UI.
 - Code-signing certificates are **not yet** wired up — see the [Installation](#installation) section for the one-time macOS / Windows hurdles. The in-app updater handles every subsequent upgrade cleanly.
 
 See [FEATURES.md](FEATURES.md) for the long-tail enhancement backlog (TLS, query cancel, WS protocol, etc.).
