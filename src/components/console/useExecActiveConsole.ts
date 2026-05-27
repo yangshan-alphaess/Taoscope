@@ -1,11 +1,16 @@
+import { useTranslation } from "react-i18next";
+
 import type { HistoryEntry } from "@/datasource/types";
 import { useDataSource } from "@/datasource/context";
 import { useAppState } from "@/store/appState";
+import { confirm } from "@/components/ui/confirm";
 import * as editorBridge from "./editorBridge";
 import {
   applyRowCap,
   ensureExplainPrefix,
   injectRowCapLimit,
+  isDestructiveStatement,
+  leadingKeyword,
 } from "./rowCapInjector";
 import { findStatementAt } from "./splitStatements";
 
@@ -23,6 +28,7 @@ const HISTORY_LIMIT = 50;
 export function useExecActiveConsole(
   mode: ExecMode,
 ): UseExecActiveConsoleResult {
+  const { t } = useTranslation("console");
   const ds = useDataSource();
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const activeConsole = useAppState((s) =>
@@ -52,7 +58,7 @@ export function useExecActiveConsole(
 
   const isRunning = runtime?.execStatus === "running";
 
-  function exec() {
+  async function exec() {
     if (!canRun || !activeConsole || !connection || !activeConsoleId) return;
     const id = activeConsoleId;
     const fullScratch = runtime?.scratch ?? "";
@@ -80,13 +86,29 @@ export function useExecActiveConsole(
     const dispatchSql =
       mode === "explain" ? ensureExplainPrefix(chosenSql) : chosenSql;
 
+    // Irreversible statements (DROP / DELETE) require confirmation before
+    // dispatch. EXPLAIN mode never executes the statement, so it is exempt.
+    if (mode === "run" && isDestructiveStatement(chosenSql)) {
+      const ok = await confirm({
+        title: t("destructive-confirm.title", {
+          keyword: leadingKeyword(chosenSql),
+        }),
+        description: t("destructive-confirm.description"),
+        confirmLabel: t("destructive-confirm.confirm"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
     const prevHistory = runtime?.history ?? [];
     const injected = injectRowCapLimit(dispatchSql);
     const queryId = crypto.randomUUID();
     setRunStarted(id, queryId);
     ds.runSql(connection.id, activeConsole.currentDb, injected, queryId)
       .then((r) => {
-        const capped = applyRowCap(r);
+        // Write/DDL results carry affectedRows and no result set; the row cap
+        // only applies to read queries.
+        const capped = r.affectedRows != null ? r : applyRowCap(r);
         const entry: HistoryEntry = {
           sql: dispatchSql,
           runAt: Date.now(),

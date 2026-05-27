@@ -67,6 +67,11 @@
     "title": "Delete console \"{{name}}\"?",
     "description": "The console and its saved SQL scratch will be permanently removed."
   },
+  "destructive-confirm": {
+    "title": "Run {{keyword}}?",
+    "description": "This operation cannot be undone. Continue?",
+    "confirm": "Run"
+  },
   "format": {
     "failed": "Failed to format SQL: {{message}}"
   }

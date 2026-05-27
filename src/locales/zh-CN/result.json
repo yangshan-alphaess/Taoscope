@@ -16,6 +16,10 @@
   "banner": {
     "truncated": "结果已截断至 {{cap}} 行。添加 {{limit}} 子句以查看具体数据。"
   },
+  "affected": {
+    "rows_other": "影响 {{count}} 行 · {{ms}}ms",
+    "success": "执行成功 · {{ms}}ms"
+  },
   "filter": {
     "title": "过滤行",
     "placeholder": "过滤…",

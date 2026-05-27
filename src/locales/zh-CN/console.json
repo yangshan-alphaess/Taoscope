@@ -67,6 +67,11 @@
     "title": "删除控制台 \"{{name}}\"？",
     "description": "该控制台及其保存的 SQL 草稿将被永久删除。"
   },
+  "destructive-confirm": {
+    "title": "执行 {{keyword}}？",
+    "description": "此操作不可撤销，确定继续？",
+    "confirm": "执行"
+  },
   "format": {
     "failed": "SQL 格式化失败：{{message}}"
   }

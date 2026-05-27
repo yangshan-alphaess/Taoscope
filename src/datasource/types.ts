@@ -111,6 +111,12 @@ export interface QueryResult {
   elapsedMs: number;
   /** True if the result was truncated to enforce a row cap. */
   truncated: boolean;
+  /**
+   * Affected-row count for write/DDL statements. When present, the result
+   * carries no result set (columns/rows empty) and renders as a success
+   * banner instead of a grid. Absent for read queries.
+   */
+  affectedRows?: number;
 }
 
 export interface Paged<T> {

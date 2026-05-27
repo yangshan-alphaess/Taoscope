@@ -16,6 +16,11 @@
   "banner": {
     "truncated": "Result was capped at {{cap}} rows. Add a {{limit}} clause to see specific data."
   },
+  "affected": {
+    "rows_one": "Affected {{count}} row · {{ms}}ms",
+    "rows_other": "Affected {{count}} rows · {{ms}}ms",
+    "success": "Executed successfully · {{ms}}ms"
+  },
   "filter": {
     "title": "Filter rows",
     "placeholder": "Filter…",

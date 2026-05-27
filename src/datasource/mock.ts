@@ -43,6 +43,32 @@ const EMPTY_QUERY_RESULT: QueryResult = {
   truncated: false,
 };
 
+const WRITE_KEYWORDS = new Set([
+  "INSERT",
+  "CREATE",
+  "ALTER",
+  "DROP",
+  "DELETE",
+  "USE",
+]);
+
+function mockLeadingKeyword(sql: string): string {
+  const stripped = sql.replace(/^\s*(?:\/\*[\s\S]*?\*\/\s*|--[^\n]*\n\s*)*/, "");
+  const m = /^[A-Za-z_]+/.exec(stripped);
+  return m ? m[0].toUpperCase() : "";
+}
+
+// Dev path: write/DDL statements return an affectedRows banner instead of a
+// grid, mirroring the Rust backend's affected-rows detection.
+function mockRunResult(sql: string): QueryResult {
+  const kw = mockLeadingKeyword(sql);
+  if (WRITE_KEYWORDS.has(kw)) {
+    const affectedRows = kw === "INSERT" || kw === "DELETE" ? 1 : 0;
+    return { ...EMPTY_QUERY_RESULT, affectedRows };
+  }
+  return { ...EMPTY_QUERY_RESULT };
+}
+
 function loadConnectionsFromStorage(): Connection[] {
   try {
     const raw = localStorage.getItem(CONNECTIONS_KEY);
@@ -292,11 +318,12 @@ export class MockDataSource implements DataSource {
         this.pending.delete(id);
         reject(new Error("Query cancelled"));
       });
+      const result = mockRunResult(sql);
       if (delay === 0) {
-        finalize({ ...EMPTY_QUERY_RESULT, columns: [], rows: [] });
+        finalize(result);
       } else {
         timer = setTimeout(() => {
-          finalize({ ...EMPTY_QUERY_RESULT, columns: [], rows: [] });
+          finalize(result);
         }, delay);
       }
     });

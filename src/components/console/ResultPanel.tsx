@@ -55,6 +55,26 @@ function FullScreenError({ message }: { message: string }) {
   );
 }
 
+function AffectedRowsBanner({ result }: { result: QueryResult }) {
+  const { t } = useTranslation("result");
+  const affected = result.affectedRows ?? 0;
+  const text =
+    affected > 0
+      ? t("affected.rows", {
+          count: affected,
+          ms: result.elapsedMs,
+        })
+      : t("affected.success", { ms: result.elapsedMs });
+  return (
+    <div className="flex h-full items-center justify-center px-4">
+      <p className="text-emerald-600 dark:text-emerald-400 text-xs">
+        <span className="mr-1">✓</span>
+        {text}
+      </p>
+    </div>
+  );
+}
+
 function GridWithBanners({ result }: { result: QueryResult }) {
   const { t } = useTranslation("result");
   const [filterQuery, setFilterQuery] = useState("");
@@ -105,6 +125,9 @@ export function ResultPanel() {
       body = <EmptyHint>{t("empty.running")}</EmptyHint>;
     } else if (execStatus === "running" && lastResult) {
       body = <GridWithBanners result={lastResult} />;
+    } else if (execStatus === "ok" && lastResult?.affectedRows != null) {
+      // Write/DDL statement: no result set, show an affected-rows banner.
+      body = <AffectedRowsBanner result={lastResult} />;
     } else if (execStatus === "ok" && lastResult) {
       // Always render the grid on success — even with 0 rows, the column
       // headers tell the user what the query *would* have returned, which is

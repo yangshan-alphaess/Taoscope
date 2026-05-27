@@ -132,6 +132,8 @@ struct ResultRows {
     columns: Vec<Column>,
     rows: Vec<Vec<JsonValue>>,
     row_count: u32,
+    /// `Some` for write/DDL statements (no fields); `None` for result sets.
+    affected_rows: Option<u32>,
 }
 
 async fn run_inner(
@@ -140,6 +142,8 @@ async fn run_inner(
     sql: &str,
 ) -> Result<ResultRows, DataSourceError> {
     if let Some(d) = db {
+        // This `USE` result is discarded; the affected-rows detection below
+        // only inspects the user statement's own ResultSet.
         let use_sql = format!("USE `{}`", d.replace('`', "``"));
         let _ = AsyncQueryable::exec(taos, &use_sql)
             .await
@@ -148,6 +152,18 @@ async fn run_inner(
     let mut rs = AsyncQueryable::query(taos, sql).await.map_err(map_err)?;
 
     let fields = rs.fields();
+
+    // Write/DDL statements produce a ResultSet with no fields; surface the
+    // affected-row count instead of an (empty) result set.
+    if fields.is_empty() {
+        return Ok(ResultRows {
+            columns: vec![],
+            rows: vec![],
+            row_count: 0,
+            affected_rows: Some(rs.affected_rows() as u32),
+        });
+    }
+
     let columns: Vec<Column> = fields
         .iter()
         .map(|f| Column {
@@ -176,6 +192,7 @@ async fn run_inner(
         columns,
         rows,
         row_count,
+        affected_rows: None,
     })
 }
 
@@ -459,6 +476,7 @@ pub async fn run_sql(
         row_count: result.row_count,
         elapsed_ms,
         truncated: false,
+        affected_rows: result.affected_rows,
     })
 }
 

@@ -188,6 +188,10 @@ pub struct QueryResult {
     pub row_count: u32,
     pub elapsed_ms: u32,
     pub truncated: bool,
+    /// Affected-row count for write/DDL statements. `Some` => no result set
+    /// (columns/rows empty), render as a success banner. `None` => read query.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub affected_rows: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

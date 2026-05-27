@@ -11,13 +11,30 @@ const LIMIT_PATTERN = /\bLIMIT\s+\d+/i;
 export const EXPLAIN_PATTERN =
   /^\s*(?:\/\*[\s\S]*?\*\/\s*|--[^\n]*\n\s*)*EXPLAIN\b/i;
 
+// Same comment/whitespace skip as EXPLAIN_PATTERN, used to read the leading
+// statement keyword regardless of leading noise.
+const LEADING_NOISE = /^\s*(?:\/\*[\s\S]*?\*\/\s*|--[^\n]*\n\s*)*/;
+
+export function leadingKeyword(sql: string): string {
+  const stripped = sql.replace(LEADING_NOISE, "");
+  const m = /^[A-Za-z_]+/.exec(stripped);
+  return m ? m[0].toUpperCase() : "";
+}
+
 export function injectRowCapLimit(sql: string): string {
-  // EXPLAIN does not accept a LIMIT clause in TDengine; appending one would
-  // turn every Explain run into a syntax error.
-  if (EXPLAIN_PATTERN.test(sql)) return sql;
+  // Only SELECT accepts a LIMIT clause in TDengine. Appending one to a write,
+  // DDL, SHOW, or DESCRIBE statement turns it into a syntax error, so the cap
+  // is injected for SELECT alone. `EXPLAIN SELECT ...` has leading keyword
+  // EXPLAIN (not SELECT) and is left unchanged, which is also correct.
+  if (leadingKeyword(sql) !== "SELECT") return sql;
   if (LIMIT_PATTERN.test(sql)) return sql;
   const trimmed = sql.replace(/;+\s*$/, "").trimEnd();
   return `${trimmed}\nLIMIT ${PROBE_LIMIT}`;
+}
+
+export function isDestructiveStatement(sql: string): boolean {
+  const kw = leadingKeyword(sql);
+  return kw === "DROP" || kw === "DELETE";
 }
 
 export function ensureExplainPrefix(sql: string): string {

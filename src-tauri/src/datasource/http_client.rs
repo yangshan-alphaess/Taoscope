@@ -401,11 +401,35 @@ pub async fn run_sql(
     let start = Instant::now();
     let resp = execute_sql(conn, db, sql).await?;
     let elapsed_ms = start.elapsed().as_millis() as u32;
+
+    // Write/DDL statements return a single `affected_rows` cell rather than a
+    // result set. Detect that shape and surface it as `affected_rows` with an
+    // empty grid. The single-cell guard (rows==1, one column, one value)
+    // avoids misclassifying a SELECT of a column literally named
+    // `affected_rows`.
+    if resp.column_meta.len() == 1
+        && resp.column_meta[0].0.eq_ignore_ascii_case("affected_rows")
+        && resp.rows == 1
+        && resp.data.len() == 1
+        && resp.data[0].len() == 1
+    {
+        let affected = cell_to_u32(&resp.data[0][0]).unwrap_or(0);
+        return Ok(QueryResult {
+            columns: vec![],
+            rows: vec![],
+            row_count: 0,
+            elapsed_ms,
+            truncated: false,
+            affected_rows: Some(affected),
+        });
+    }
+
     Ok(QueryResult {
         columns: parse_columns(&resp.column_meta),
         rows: resp.data,
         row_count: resp.rows,
         elapsed_ms,
         truncated: false,
+        affected_rows: None,
     })
 }
