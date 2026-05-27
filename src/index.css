@@ -96,6 +96,18 @@
     overflow: hidden; /* desktop app: never scroll the window itself */
   }
 
+  /* Drop the OS-drawn number spinners so number inputs match our custom
+     controls across platforms (their chrome differs per OS/WebView). */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   /* The two arbitrary-value tiny-text utilities in the codebase (chips /
      timestamps) also get nudged so they don't lag behind the rem bump. */
   .text-\[10px\] {

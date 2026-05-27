@@ -21,6 +21,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Mode = "create" | "edit";
 
@@ -254,15 +262,11 @@ export function ConnectionFormDialog({
           </Field>
           <Field label={t("form.field.host")} error={errors.host}>
             <div className="flex gap-1.5">
-              <select
+              <Select
                 value={schemeLabel(form.protocol, form.transport)}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   setForm((prev) => {
-                    const scheme = e.target.value as
-                      | "http"
-                      | "https"
-                      | "ws"
-                      | "wss";
+                    const scheme = value as "http" | "https" | "ws" | "wss";
                     const next = schemeToFields(scheme);
                     return {
                       ...prev,
@@ -276,16 +280,17 @@ export function ConnectionFormDialog({
                     };
                   })
                 }
-                className={cn(
-                  "h-8 rounded border border-input bg-background px-2 text-xs",
-                  "focus-visible:outline-none focus-visible:ring-1",
-                )}
               >
-                <option value="http">http://</option>
-                <option value="https">https://</option>
-                <option value="ws">ws://</option>
-                <option value="wss">wss://</option>
-              </select>
+                <SelectTrigger className="w-24 shrink-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="http">http://</SelectItem>
+                  <SelectItem value="https">https://</SelectItem>
+                  <SelectItem value="ws">ws://</SelectItem>
+                  <SelectItem value="wss">wss://</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
                 value={form.host}
                 onChange={(e) => {
@@ -327,13 +332,11 @@ export function ConnectionFormDialog({
           {form.protocol === "https" && (
             <div className="grid gap-1 -mt-1">
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={form.allowInvalidCerts ?? false}
-                  onChange={(e) =>
-                    update("allowInvalidCerts", e.target.checked)
+                  onCheckedChange={(v) =>
+                    update("allowInvalidCerts", v === true)
                   }
-                  className="h-3.5 w-3.5"
                 />
                 <span>
                   {t("form.https.allow-invalid")}{" "}

@@ -16,6 +16,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   buildCreateChild,
   buildCreateDatabase,
@@ -458,23 +466,22 @@ function ColumnEditor({
               onChange={(e) => onUpdate(i, { name: e.target.value })}
               title={errors.get(i)}
             />
-            <select
-              className={cn(
-                "border-input bg-background h-8 rounded border px-1.5 text-xs",
-                "w-28",
-              )}
+            <Select
               value={c.type}
               disabled={c.primaryTs}
-              onChange={(e) =>
-                onUpdate(i, { type: e.target.value as TdDataType })
-              }
+              onValueChange={(v) => onUpdate(i, { type: v as TdDataType })}
             >
-              {TYPE_OPTIONS.map((ty) => (
-                <option key={ty} value={ty}>
-                  {ty}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-28 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPE_OPTIONS.map((ty) => (
+                  <SelectItem key={ty} value={ty}>
+                    {ty}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               className={cn(inputClass, "w-16")}
               type="number"
@@ -491,12 +498,10 @@ function ColumnEditor({
             />
             {showTagToggle && (
               <label className="text-muted-foreground flex w-10 shrink-0 items-center justify-center gap-1 text-[11px]">
-                <input
-                  type="checkbox"
-                  className="h-3 w-3"
+                <Checkbox
                   checked={c.isTag}
                   disabled={c.primaryTs}
-                  onChange={(e) => onUpdate(i, { isTag: e.target.checked })}
+                  onCheckedChange={(v) => onUpdate(i, { isTag: v === true })}
                 />
                 {t("columns.col-tag")}
               </label>
