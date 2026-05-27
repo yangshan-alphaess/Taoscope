@@ -29,7 +29,7 @@ export function LocaleToggle() {
           type="button"
           title={t("locale-toggle.label")}
           aria-label={t("locale-toggle.label")}
-          className="text-primary hover:bg-muted/50 inline-flex items-center justify-center rounded-sm p-1"
+          className="text-primary hover:bg-muted/50 focus-visible:ring-ring inline-flex items-center justify-center rounded-sm p-1 outline-none focus-visible:ring-1"
         >
           <Languages className="h-3.5 w-3.5" />
         </button>

@@ -91,7 +91,7 @@ function GithubLink() {
       }}
       title={t("github.tooltip")}
       aria-label={t("github.tooltip")}
-      className="hover:bg-muted/50 hover:text-foreground inline-flex items-center justify-center rounded-sm p-1"
+      className="hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring inline-flex items-center justify-center rounded-sm p-1 outline-none focus-visible:ring-1"
     >
       <Github className="h-3.5 w-3.5" />
     </button>
@@ -208,7 +208,7 @@ function UpdaterStatus() {
       disabled={!interactive}
       title={title}
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5",
+        "focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 outline-none focus-visible:ring-1",
         interactive
           ? "hover:bg-muted/50 hover:text-foreground"
           : "cursor-default",
