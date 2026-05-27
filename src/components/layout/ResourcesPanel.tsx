@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
 import { buildDrop, type DropKind } from "@/components/console/ddlBuilder";
 import { ConnectionFormDialog } from "@/components/layout/ConnectionFormDialog";
+import { ResourcesFooter } from "@/components/layout/StatusBar";
 import {
   TableDesignerDialog,
   type DesignerMode,
@@ -45,6 +46,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -85,6 +87,62 @@ export interface DropArgs {
   connId: string;
   db: string;
   name: string;
+}
+
+// A single action descriptor rendered identically into both the hover "⋯"
+// dropdown and the right-click context menu, so the two menus never drift.
+interface MenuAction {
+  key: string;
+  icon: ReactNode;
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  /** Render a separator immediately before this item. */
+  separatorBefore?: boolean;
+}
+
+function DropdownActions({ actions }: { actions: MenuAction[] }) {
+  return (
+    <>
+      {actions.map((a) => (
+        <Fragment key={a.key}>
+          {a.separatorBefore && <DropdownMenuSeparator />}
+          <DropdownMenuItem
+            disabled={a.disabled}
+            onSelect={a.onSelect}
+            className={cn(
+              a.danger && "text-destructive focus:text-destructive",
+            )}
+          >
+            {a.icon}
+            {a.label}
+          </DropdownMenuItem>
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+function ContextActions({ actions }: { actions: MenuAction[] }) {
+  return (
+    <>
+      {actions.map((a) => (
+        <Fragment key={a.key}>
+          {a.separatorBefore && <ContextMenuSeparator />}
+          <ContextMenuItem
+            disabled={a.disabled}
+            onSelect={a.onSelect}
+            className={cn(
+              a.danger && "text-destructive focus:text-destructive",
+            )}
+          >
+            {a.label}
+          </ContextMenuItem>
+        </Fragment>
+      ))}
+    </>
+  );
 }
 
 type ColumnsState = Column[] | "loading" | "error";
@@ -745,6 +803,50 @@ export function ResourcesPanel() {
           visibleConnections.map((c) => {
             const isOpen = filterActive || expandedConns.has(c.id);
             const isOffline = c.status === "offline";
+            const connActions: MenuAction[] = [
+              {
+                key: "new-console",
+                icon: <FilePlus className="h-3.5 w-3.5" />,
+                label: t("resources-panel.context-menu.new-console"),
+                disabled: isOffline,
+                onSelect: () => void createConsole(c.id),
+              },
+              {
+                key: "new-database",
+                icon: <DbIcon className="h-3.5 w-3.5" />,
+                label: t("resources-panel.context-menu.new-database"),
+                disabled: isOffline,
+                onSelect: () =>
+                  openDesigner({
+                    mode: "create-database",
+                    connId: c.id,
+                    db: "",
+                  }),
+              },
+              {
+                key: "refresh",
+                separatorBefore: true,
+                icon: <RefreshCw className="h-3.5 w-3.5" />,
+                label: t("resources-panel.context-menu.refresh"),
+                disabled: isOffline,
+                onSelect: () => void handleRefreshConnection(c),
+              },
+              {
+                key: "edit",
+                icon: <Pencil className="h-3.5 w-3.5" />,
+                label: t("resources-panel.context-menu.edit"),
+                onSelect: () =>
+                  setDialogState({ open: true, mode: "edit", conn: c }),
+              },
+              {
+                key: "delete",
+                separatorBefore: true,
+                icon: <Trash2 className="h-3.5 w-3.5" />,
+                label: t("resources-panel.context-menu.delete"),
+                danger: true,
+                onSelect: () => void handleDeleteConnection(c),
+              },
+            ];
             return (
               <div key={c.id}>
                 <ContextMenu>
@@ -779,79 +881,24 @@ export function ResourcesPanel() {
                             type="button"
                             onClick={(e) => e.stopPropagation()}
                             className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible data-[state=open]:visible focus-visible:visible"
-                            aria-label={`Actions for ${c.name}`}
-                            title={`Actions for ${c.name}`}
+                            aria-label={t("resources-panel.tooltip.actions-for", {
+                              name: c.name,
+                            })}
+                            title={t("resources-panel.tooltip.actions-for", {
+                              name: c.name,
+                            })}
                           >
                             <MoreHorizontal className="h-3 w-3" />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
-                            disabled={isOffline}
-                            onSelect={() => {
-                              void createConsole(c.id);
-                            }}
-                          >
-                            <FilePlus className="h-3.5 w-3.5" />
-                            {t("resources-panel.context-menu.new-console")}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            disabled={isOffline}
-                            onSelect={() => {
-                              void handleRefreshConnection(c);
-                            }}
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            {t("resources-panel.context-menu.refresh")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              setDialogState({
-                                open: true,
-                                mode: "edit",
-                                conn: c,
-                              });
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            {t("resources-panel.context-menu.edit")}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              void handleDeleteConnection(c);
-                            }}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            {t("resources-panel.context-menu.delete")}
-                          </DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownActions actions={connActions} />
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem
-                      disabled={isOffline}
-                      onSelect={() => {
-                        void createConsole(c.id);
-                      }}
-                    >
-                      {t("resources-panel.context-menu.new-console")}
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      disabled={isOffline}
-                      onSelect={() =>
-                        openDesigner({
-                          mode: "create-database",
-                          connId: c.id,
-                          db: "",
-                        })
-                      }
-                    >
-                      {t("resources-panel.context-menu.new-database")}
-                    </ContextMenuItem>
+                    <ContextActions actions={connActions} />
                   </ContextMenuContent>
                 </ContextMenu>
 
@@ -888,6 +935,8 @@ export function ResourcesPanel() {
           })
         )}
       </div>
+
+      <ResourcesFooter />
 
       <ConnectionFormDialog
         open={dialogState.open}
@@ -1021,6 +1070,57 @@ function ConnectionBody({
       {dbs.map((db) => {
         const dbKey = `${conn.id}|${db.name}`;
         const dbOpen = filterActive || expandedDbs.has(dbKey);
+        const dbActions: MenuAction[] = [
+          {
+            key: "new-console",
+            icon: <FilePlus className="h-3.5 w-3.5" />,
+            label: t("resources-panel.context-menu.new-console"),
+            onSelect: () => onCreateConsoleInDb(conn.id, db.name),
+          },
+          {
+            key: "new-stable",
+            icon: <Layers className="h-3.5 w-3.5" />,
+            label: t("resources-panel.context-menu.new-stable"),
+            onSelect: () =>
+              onOpenDesigner({
+                mode: "create-stable",
+                connId: conn.id,
+                db: db.name,
+              }),
+          },
+          {
+            key: "new-table",
+            icon: <FileText className="h-3.5 w-3.5" />,
+            label: t("resources-panel.context-menu.new-table"),
+            onSelect: () =>
+              onOpenDesigner({
+                mode: "create-table",
+                connId: conn.id,
+                db: db.name,
+              }),
+          },
+          {
+            key: "refresh",
+            separatorBefore: true,
+            icon: <RefreshCw className="h-3.5 w-3.5" />,
+            label: t("resources-panel.context-menu.refresh"),
+            onSelect: () => onRefreshDb(conn.id, db.name),
+          },
+          {
+            key: "drop-database",
+            separatorBefore: true,
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            label: t("resources-panel.context-menu.drop-database"),
+            danger: true,
+            onSelect: () =>
+              onDrop({
+                kind: "database",
+                connId: conn.id,
+                db: db.name,
+                name: db.name,
+              }),
+          },
+        ];
         return (
           <div key={db.name}>
             <ContextMenu>
@@ -1042,81 +1142,30 @@ function ConnectionBody({
                       {highlight(db.name, query)}
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCreateConsoleInDb(conn.id, db.name);
-                    }}
-                    className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible shrink-0 rounded-sm p-1 group-hover:visible"
-                    aria-label={t("resources-panel.tooltip.new-console-in", {
-                      name: db.name,
-                    })}
-                    title={t("resources-panel.tooltip.new-console-in", {
-                      name: db.name,
-                    })}
-                  >
-                    <FilePlus className="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRefreshDb(conn.id, db.name);
-                    }}
-                    className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible"
-                    aria-label={t("resources-panel.tooltip.refresh-db", {
-                      name: db.name,
-                    })}
-                    title={t("resources-panel.tooltip.refresh-db", {
-                      name: db.name,
-                    })}
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 invisible mr-1 shrink-0 rounded-sm p-1 group-hover:visible data-[state=open]:visible focus-visible:visible"
+                        aria-label={t("resources-panel.tooltip.actions-for", {
+                          name: db.name,
+                        })}
+                        title={t("resources-panel.tooltip.actions-for", {
+                          name: db.name,
+                        })}
+                      >
+                        <MoreHorizontal className="h-3 w-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownActions actions={dbActions} />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem
-                  onSelect={() => onCreateConsoleInDb(conn.id, db.name)}
-                >
-                  {t("resources-panel.context-menu.new-console")}
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onOpenDesigner({
-                      mode: "create-stable",
-                      connId: conn.id,
-                      db: db.name,
-                    })
-                  }
-                >
-                  {t("resources-panel.context-menu.new-stable")}
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onOpenDesigner({
-                      mode: "create-table",
-                      connId: conn.id,
-                      db: db.name,
-                    })
-                  }
-                >
-                  {t("resources-panel.context-menu.new-table")}
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() =>
-                    onDrop({
-                      kind: "database",
-                      connId: conn.id,
-                      db: db.name,
-                      name: db.name,
-                    })
-                  }
-                  className="text-destructive focus:text-destructive"
-                >
-                  {t("resources-panel.context-menu.drop-database")}
-                </ContextMenuItem>
+                <ContextActions actions={dbActions} />
               </ContextMenuContent>
             </ContextMenu>
             {dbOpen && (

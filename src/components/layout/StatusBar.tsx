@@ -16,65 +16,54 @@ declare const __APP_VERSION__: string;
 const APP_VERSION =
   typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
 
-export function StatusBar() {
+/**
+ * Borderless cluster docked at the bottom of the Resources panel: repo link,
+ * updater/version, and locale toggle.
+ */
+export function ResourcesFooter() {
+  return (
+    <div className="text-muted-foreground border-border flex shrink-0 items-center justify-center gap-2 border-t px-3 py-1 font-mono text-xs">
+      <GithubLink />
+      <span className="text-muted-foreground/40">·</span>
+      <UpdaterStatus />
+      <span className="text-muted-foreground/40">·</span>
+      <LocaleToggle />
+    </div>
+  );
+}
+
+/**
+ * Floating pill centered at the bottom of the Result panel, showing the active
+ * query's row count + elapsed time (or a running indicator). Hidden when idle
+ * or when the result is a write/DDL affected-rows banner.
+ */
+export function ResultStatsPill() {
   const { t } = useTranslation("common");
   const activeConsoleId = useAppState((s) => s.activeConsoleId);
   const runtime = useAppState((s) =>
     activeConsoleId ? s.consoleRuntime[activeConsoleId] : undefined,
   );
 
-  // No active console -> "ready". With a runtime, follow its execStatus.
   const status = runtime?.execStatus ?? "idle";
+  const result = runtime?.lastResult;
+  const showStats =
+    status === "ok" && result != null && result.affectedRows == null;
 
-  let leftLabel: string;
-  switch (status) {
-    case "idle":
-      leftLabel = t("status.ready");
-      break;
-    case "running":
-      leftLabel = t("status.running");
-      break;
-    case "ok":
-      leftLabel = t("status.ok");
-      break;
-    case "error":
-      leftLabel = `${t("status.error")}: ${runtime?.execError ?? "unknown"}`;
-      break;
+  let text: string | null = null;
+  if (status === "running") {
+    text = t("status.running");
+  } else if (showStats) {
+    text = `${result!.rowCount} ${t("unit.rows")} · ${result!.elapsedMs} ${t("unit.ms")}`;
   }
 
-  const showStats = status === "ok" && runtime?.lastResult != null;
-  // Idle no longer renders a "ready" label; only transient states surface.
-  const statusLabel = status === "idle" ? null : leftLabel;
+  if (!text) return null;
 
   return (
-    <footer className="text-muted-foreground flex h-6 shrink-0 items-center justify-between px-3 text-xs">
-      <div className="flex items-center gap-2 font-mono">
-        <GithubLink />
-        <span className="text-muted-foreground/40">·</span>
-        <UpdaterStatus />
-        <span className="text-muted-foreground/40">·</span>
-        <LocaleToggle />
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+      <div className="bg-background/80 border-border text-muted-foreground pointer-events-auto rounded-full border px-3 py-1 font-mono text-xs shadow-md backdrop-blur">
+        {text}
       </div>
-      <div className="flex min-w-0 items-center gap-2 font-mono">
-        {statusLabel && (
-          <>
-            <span className="truncate">{statusLabel}</span>
-            <span className="text-muted-foreground/40">·</span>
-          </>
-        )}
-        <span className="whitespace-nowrap">
-          {showStats
-            ? `${runtime!.lastResult!.rowCount} ${t("unit.rows")}`
-            : `— ${t("unit.rows")}`}
-        </span>
-        <span className="text-muted-foreground/40">·</span>
-        <span className="whitespace-nowrap">
-          {showStats
-            ? `${runtime!.lastResult!.elapsedMs} ${t("unit.ms")}`
-            : `— ${t("unit.ms")}`}
-        </span>
-      </div>
-    </footer>
+    </div>
   );
 }
 

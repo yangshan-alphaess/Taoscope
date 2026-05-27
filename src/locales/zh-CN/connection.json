@@ -87,9 +87,7 @@
       "drop-table": "删除表"
     },
     "tooltip": {
-      "actions-for": "{{name}} 的操作",
-      "new-console-in": "在 {{name}} 新建控制台",
-      "refresh-db": "刷新 {{name}}"
+      "actions-for": "{{name}} 的操作"
     },
     "tree": {
       "loading": "加载中…",

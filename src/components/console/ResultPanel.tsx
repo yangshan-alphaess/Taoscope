@@ -5,6 +5,7 @@ import type { QueryResult } from "@/datasource/types";
 import { useAppState } from "@/store/appState";
 import { ResultExportBar } from "@/components/console/ResultExportBar";
 import { ResultGrid } from "@/components/console/ResultGrid";
+import { ResultStatsPill } from "@/components/layout/StatusBar";
 
 function EmptyHint({ children }: { children: ReactNode }) {
   return (
@@ -146,8 +147,9 @@ export function ResultPanel() {
   }
 
   return (
-    <div className="border-border/70 bg-card flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-[0_4px_16px_-4px_rgba(0,0,0,0.45),inset_0_1px_0_0_hsl(0_0%_100%/0.05)]">
+    <div className="border-border/70 bg-card relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-[0_4px_16px_-4px_rgba(0,0,0,0.45),inset_0_1px_0_0_hsl(0_0%_100%/0.05)]">
       {body}
+      <ResultStatsPill />
     </div>
   );
 }

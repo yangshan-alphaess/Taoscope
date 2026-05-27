@@ -88,9 +88,7 @@
       "drop-table": "Drop table"
     },
     "tooltip": {
-      "actions-for": "Actions for {{name}}",
-      "new-console-in": "New console in {{name}}",
-      "refresh-db": "Refresh {{name}}"
+      "actions-for": "Actions for {{name}}"
     },
     "tree": {
       "loading": "Loading…",

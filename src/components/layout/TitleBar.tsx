@@ -64,24 +64,19 @@ export function TitleBar() {
     <div
       data-tauri-drag-region
       className={cn(
-        // h-7 (~28px) matches the native macOS titlebar height, so traffic
-        // lights and our centered content share the same vertical midline.
+        // h-9 (~36px) gives the frame some breathing room. The native macOS
+        // traffic lights are overlaid by the OS near the top-left; our content
+        // is vertically centered in the taller bar.
         // Transparent: it sits on the gradient shell as part of the frame.
         // macOS reserves left room for the native traffic lights; elsewhere
         // the brand hugs the far-left edge.
-        "flex h-7 shrink-0 items-center pr-4 select-none",
+        "flex h-9 shrink-0 items-center pr-4 select-none",
         isMac ? "pl-20" : "pl-3",
       )}
     >
       <div
         data-tauri-drag-region
-        className={cn(
-          "flex items-center gap-2",
-          // Nudge text-bearing groups down 2px so the glyph midline matches
-          // the macOS traffic-light center (AppKit overlays them at a fixed
-          // offset that's slightly below our flex-centered position).
-          isMac && "mt-[4px]",
-        )}
+        className={cn("flex items-center gap-2", isMac && "-mt-[4px]")}
       >
         <img
           src="/app-icon.svg"
@@ -97,7 +92,7 @@ export function TitleBar() {
         data-tauri-drag-region
         className={cn(
           "flex flex-1 items-center justify-center gap-2",
-          isMac && "mt-[2px]",
+          isMac && "-mt-[2px]",
         )}
       >
         <span className="text-muted-foreground text-xs leading-none">

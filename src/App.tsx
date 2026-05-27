@@ -5,7 +5,6 @@ import { useUpdater } from "@/lib/updater";
 import { useAppState } from "@/store/appState";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { ResourcesPanel } from "@/components/layout/ResourcesPanel";
-import { StatusBar } from "@/components/layout/StatusBar";
 import { ConsolesPanel } from "@/components/console/ConsolesPanel";
 import { Editor } from "@/components/console/Editor";
 import { ResultPanel } from "@/components/console/ResultPanel";
@@ -103,7 +102,6 @@ function App() {
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
-        <StatusBar />
         <Toaster richColors position="bottom-right" />
         <ConfirmRoot />
         <ConsoleShortcuts />
