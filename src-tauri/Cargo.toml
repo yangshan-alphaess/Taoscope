@@ -3,6 +3,7 @@ name = "taoscope"
 version = "1.0.0"
 description = "Taoscope — a desktop manager for TDengine"
 authors = ["Taoscope contributors"]
+license = "MIT"
 edition = "2021"
 
 [lib]
