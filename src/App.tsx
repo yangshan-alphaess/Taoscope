@@ -54,16 +54,16 @@ function App() {
 
   return (
     <DataSourceProvider value={dataSource}>
-      <div className="flex h-screen w-screen flex-col overflow-hidden">
+      <div className="bg-surface-0 flex h-screen w-screen flex-col overflow-hidden bg-gradient-to-b from-[hsl(220_8%_10.5%)] to-[hsl(220_9%_7.5%)]">
         <TitleBar />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 gap-1.5 px-1.5 pb-1.5">
           <ResizablePanelGroup
             direction="horizontal"
             autoSaveId="resources-main"
           >
             <ResizablePanel
               defaultSize={20}
-              minSize={12}
+              minSize={15}
               maxSize={40}
             >
               <ResourcesPanel />
@@ -80,7 +80,7 @@ function App() {
                     autoSaveId="editor-consoles"
                   >
                     <ResizablePanel defaultSize={75} minSize={40}>
-                      <div className="flex h-full min-h-0 flex-col">
+                      <div className="border-border/70 bg-card focus-within:border-primary/50 flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-[0_4px_16px_-4px_rgba(0,0,0,0.45),inset_0_1px_0_0_hsl(0_0%_100%/0.05)] transition-colors">
                         <Toolbar />
                         <Editor />
                       </div>

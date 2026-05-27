@@ -33,3 +33,5 @@ tokio-util = { version = "0.7", default-features = false }
 # Updater (in-app upgrades). Native installers + ed25519 signature verification.
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# Opens external URLs (e.g. the GitHub repo link) in the system browser.
+tauri-plugin-opener = "2"

@@ -1,11 +1,14 @@
-import { Download, Loader2, RefreshCw } from "lucide-react";
+import { Download, Github, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 
 import { LocaleToggle } from "@/components/layout/LocaleToggle";
 import { useUpdater } from "@/lib/updater";
 import { useAppState } from "@/store/appState";
+import { openExternal } from "@/lib/openExternal";
 import { cn } from "@/lib/utils";
+
+const REPO_URL = "https://github.com/yangshan-alphaess/Taoscope";
 
 // __APP_VERSION__ is injected by Vite (see vite.config.ts) at build time from
 // package.json so a stale hard-coded value can't drift out of sync.
@@ -40,41 +43,58 @@ export function StatusBar() {
   }
 
   const showStats = status === "ok" && runtime?.lastResult != null;
+  // Idle no longer renders a "ready" label; only transient states surface.
+  const statusLabel = status === "idle" ? null : leftLabel;
 
   return (
-    <footer className="bg-background border-border text-muted-foreground flex h-6 shrink-0 items-center justify-between border-t px-3 text-xs">
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={cn(
-            "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
-            status === "ok"
-              ? "bg-primary"
-              : status === "error"
-                ? "bg-destructive"
-                : status === "running"
-                  ? "bg-muted-foreground animate-pulse"
-                  : "bg-muted-foreground/50",
-          )}
-        />
-        <span className="truncate">{leftLabel}</span>
-      </div>
-      <div className="font-mono">
-        {showStats
-          ? `${runtime!.lastResult!.rowCount} ${t("unit.rows")}`
-          : `— ${t("unit.rows")}`}
-      </div>
+    <footer className="text-muted-foreground flex h-6 shrink-0 items-center justify-between px-3 text-xs">
       <div className="flex items-center gap-2 font-mono">
-        <span>
+        <UpdaterStatus />
+        <span className="text-muted-foreground/40">·</span>
+        <GithubLink />
+        <span className="text-muted-foreground/40">·</span>
+        <LocaleToggle />
+      </div>
+      <div className="flex min-w-0 items-center gap-2 font-mono">
+        {statusLabel && (
+          <>
+            <span className="truncate">{statusLabel}</span>
+            <span className="text-muted-foreground/40">·</span>
+          </>
+        )}
+        <span className="whitespace-nowrap">
+          {showStats
+            ? `${runtime!.lastResult!.rowCount} ${t("unit.rows")}`
+            : `— ${t("unit.rows")}`}
+        </span>
+        <span className="text-muted-foreground/40">·</span>
+        <span className="whitespace-nowrap">
           {showStats
             ? `${runtime!.lastResult!.elapsedMs} ${t("unit.ms")}`
             : `— ${t("unit.ms")}`}
         </span>
-        <span className="text-muted-foreground/40">·</span>
-        <UpdaterStatus />
-        <span className="text-muted-foreground/40">·</span>
-        <LocaleToggle />
       </div>
     </footer>
+  );
+}
+
+function GithubLink() {
+  const { t } = useTranslation("common");
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        openExternal(REPO_URL).catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          toast.error(t("github.open-failed", { error: msg }));
+        });
+      }}
+      title={t("github.tooltip")}
+      aria-label={t("github.tooltip")}
+      className="hover:bg-muted/50 hover:text-foreground inline-flex items-center justify-center rounded-sm p-1"
+    >
+      <Github className="h-3.5 w-3.5" />
+    </button>
   );
 }
 

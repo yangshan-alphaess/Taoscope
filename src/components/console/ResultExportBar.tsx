@@ -161,7 +161,7 @@ export function ResultExportBar({
       });
 
   return (
-    <div className="border-border bg-card/40 flex shrink-0 items-center gap-1 border-b px-2 py-1">
+    <div className="border-border flex shrink-0 items-center gap-1 border-b bg-gradient-to-b from-white/[0.03] to-transparent px-2 py-1">
       {renderButton(
         "copyCsv",
         <Copy className="h-3 w-3" />,

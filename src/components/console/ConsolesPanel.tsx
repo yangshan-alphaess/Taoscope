@@ -57,8 +57,8 @@ export function ConsolesPanel() {
   }
 
   return (
-    <section className="bg-background flex h-full min-h-0 flex-col">
-      <div className="border-border flex h-9 shrink-0 items-center border-b px-3">
+    <section className="bg-background border-border/70 flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-[0_2px_8px_-2px_rgba(0,0,0,0.35),inset_0_1px_0_0_hsl(0_0%_100%/0.04)]">
+      <div className="border-border flex h-9 shrink-0 items-center border-b bg-gradient-to-b from-white/[0.03] to-transparent px-3">
         <h2 className="text-xs font-semibold tracking-wide uppercase">
           {t("consoles-panel.title")}
         </h2>
@@ -139,10 +139,10 @@ export function ConsolesPanel() {
                                   if (!isActive) setActiveConsole(c.id);
                                 }}
                                 className={cn(
-                                  "group hover:bg-muted/40 flex cursor-pointer items-center gap-2 px-2 py-1",
+                                  "group hover:bg-muted/40 flex cursor-pointer items-center gap-2 border-l-2 px-2 py-1",
                                   isActive
-                                    ? "text-foreground bg-muted/60 font-medium"
-                                    : "text-muted-foreground",
+                                    ? "border-l-primary text-foreground bg-muted/60 font-medium"
+                                    : "border-l-transparent text-muted-foreground",
                                 )}
                               >
                                 <span

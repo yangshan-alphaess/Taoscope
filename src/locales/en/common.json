@@ -23,7 +23,12 @@
   },
   "locale-toggle": {
     "tooltip-to-zh": "切换到中文",
-    "tooltip-to-en": "Switch to English"
+    "tooltip-to-en": "Switch to English",
+    "label": "Language"
+  },
+  "github": {
+    "tooltip": "Open GitHub repository",
+    "open-failed": "Failed to open browser: {{error}}"
   },
   "titlebar": {
     "conn-label": "conn:"

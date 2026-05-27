@@ -1,29 +1,55 @@
 import { useTranslation } from "react-i18next";
+import { Check, Languages } from "lucide-react";
 import { changeLocale, type AppLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// Language names are shown in their own script regardless of the active
+// locale, so they live as plain literals (rendered via {expression}, which the
+// jsx-text-only lint gate does not flag) rather than translatable copy.
+const LOCALES: { value: AppLocale; label: string }[] = [
+  { value: "zh-CN", label: "中文" },
+  { value: "en", label: "English" },
+];
 
 export function LocaleToggle() {
   const { i18n, t } = useTranslation("common");
-  const current = (i18n.language as AppLocale) === "zh-CN" ? "zh-CN" : "en";
-  const next: AppLocale = current === "en" ? "zh-CN" : "en";
-  // Glyph stays canonical regardless of active locale (per design decision 6).
-  const label = next === "zh-CN" ? "中" : "EN";
-  const tooltip =
-    next === "zh-CN"
-      ? t("locale-toggle.tooltip-to-zh")
-      : t("locale-toggle.tooltip-to-en");
+  const current: AppLocale =
+    (i18n.language as AppLocale) === "zh-CN" ? "zh-CN" : "en";
 
   return (
-    <button
-      type="button"
-      onClick={() => void changeLocale(next)}
-      title={tooltip}
-      className={cn(
-        "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5",
-        "hover:bg-muted/50 hover:text-foreground",
-      )}
-    >
-      {label}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          title={t("locale-toggle.label")}
+          aria-label={t("locale-toggle.label")}
+          className="text-primary hover:bg-muted/50 inline-flex items-center justify-center rounded-sm p-1"
+        >
+          <Languages className="h-3.5 w-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-28">
+        {LOCALES.map((l) => (
+          <DropdownMenuItem
+            key={l.value}
+            onSelect={() => void changeLocale(l.value)}
+          >
+            <Check
+              className={cn(
+                "h-3.5 w-3.5",
+                current === l.value ? "opacity-100" : "opacity-0",
+              )}
+            />
+            {l.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

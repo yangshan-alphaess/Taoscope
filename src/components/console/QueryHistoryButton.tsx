@@ -32,17 +32,17 @@ const HistoryTrigger = forwardRef<HTMLButtonElement, ToolbarTriggerProps>(
         type="button"
         disabled={disabled}
         title={title}
+        aria-label={label}
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+          "flex items-center justify-center rounded-md p-1.5 transition-colors",
           disabled
-            ? "text-muted-foreground/60 cursor-not-allowed"
+            ? "text-muted-foreground/50"
             : "text-muted-foreground hover:bg-muted hover:text-foreground",
           className,
         )}
         {...rest}
       >
         <Clock className="h-3.5 w-3.5" />
-        <span>{label}</span>
       </button>
     );
   },

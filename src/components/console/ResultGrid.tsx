@@ -206,7 +206,7 @@ export function ResultGrid({
         style={{ display: "block", width: totalWidth }}
       >
         <thead
-          className="bg-card sticky top-0 z-10"
+          className="bg-muted sticky top-0 z-10 shadow-[0_2px_5px_-3px_rgba(0,0,0,0.45)]"
           style={{ display: "block" }}
         >
           {table.getHeaderGroups().map((headerGroup) => (
@@ -251,7 +251,7 @@ export function ResultGrid({
                   <ContextMenu key={header.id}>
                     <ContextMenuTrigger asChild>
                       <th
-                        className="bg-card hover:bg-muted/40 text-foreground border-border relative cursor-pointer border-r border-b px-2 py-1 text-left text-xs font-medium select-none last:border-r-0"
+                        className="bg-muted hover:bg-muted/70 text-foreground border-border relative cursor-pointer border-r border-b px-2 py-1 text-left text-xs font-semibold tracking-wide select-none last:border-r-0"
                         style={{
                           width: header.getSize(),
                           flexShrink: 0,
@@ -354,7 +354,10 @@ export function ResultGrid({
             return (
               <tr
                 key={row.id}
-                className="hover:bg-muted/30 border-border/50 border-b"
+                className={cn(
+                  "border-border/50 border-b hover:bg-muted/30",
+                  vRow.index % 2 === 1 && "bg-foreground/[0.03]",
+                )}
                 style={{
                   display: "flex",
                   position: "absolute",

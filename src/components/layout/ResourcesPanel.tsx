@@ -595,20 +595,19 @@ export function ResourcesPanel() {
   ]);
 
   return (
-    <section className="bg-background flex h-full min-h-0 flex-col">
-      <div className="border-border flex h-9 shrink-0 items-center justify-between border-b pr-1 pl-3">
-        <h2 className="text-xs font-semibold tracking-wide uppercase">
+    <section className="bg-background border-border/70 flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-[0_2px_8px_-2px_rgba(0,0,0,0.35),inset_0_1px_0_0_hsl(0_0%_100%/0.04)]">
+      <div className="border-border flex h-9 shrink-0 items-center justify-between border-b bg-gradient-to-b from-white/[0.03] to-transparent pr-1 pl-3">
+        <h2 className="min-w-0 truncate text-xs font-semibold tracking-wide uppercase">
           {t("resources-panel.title")}
         </h2>
         <button
           type="button"
           onClick={() => setDialogState({ open: true, mode: "create" })}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center gap-1 rounded-sm px-2 py-1 text-xs"
+          className="text-primary hover:bg-muted/50 flex shrink-0 items-center justify-center rounded-md p-1.5"
           aria-label={t("resources-panel.new")}
           title={t("resources-panel.new")}
         >
-          <Plus className="h-3.5 w-3.5" />
-          <span>{t("resources-panel.new")}</span>
+          <Plus className="h-4 w-4 shrink-0" />
         </button>
       </div>
 
@@ -670,7 +669,7 @@ export function ResourcesPanel() {
                           )}
                           aria-hidden
                         />
-                        <span className="truncate font-medium" title={c.name}>
+                        <span className="min-w-0 truncate font-medium" title={c.name}>
                           {highlight(c.name, query)}
                         </span>
                       </button>
@@ -874,7 +873,7 @@ function ConnectionBody({
                       <ChevronRight className="h-3 w-3 shrink-0" />
                     )}
                     <DbIcon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate" title={db.name}>
+                    <span className="min-w-0 truncate" title={db.name}>
                       {highlight(db.name, query)}
                     </span>
                   </button>
@@ -1023,10 +1022,10 @@ function DatabaseBody({
                 <ChevronRight className="h-3 w-3 shrink-0" />
               )}
               <Layers className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate" title={stb.name}>
+              <span className="min-w-0 truncate" title={stb.name}>
                 {highlight(stb.name, query)}
               </span>
-              <span className="text-muted-foreground/70 ml-auto font-mono">
+              <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
                 {tr("resources-panel.tree.stable-badge", {
                   count: stb.childCount,
                 })}
@@ -1075,7 +1074,7 @@ function DatabaseBody({
                 <ChevronRight className="h-3 w-3 shrink-0" />
               )}
               <FileText className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate" title={tbl.name}>
+              <span className="min-w-0 truncate" title={tbl.name}>
                 {highlight(tbl.name, query)}
               </span>
             </button>
@@ -1157,7 +1156,7 @@ function TableBody({
         ) : (
           <ChevronRight className="h-3 w-3 shrink-0" />
         )}
-        <span className="truncate">{t("resources-panel.tree.columns-tags")}</span>
+        <span className="min-w-0 truncate">{t("resources-panel.tree.columns-tags")}</span>
       </button>
       {colsOpen && (
         <ColumnsList state={columnsByTable[key]} query={query} />
@@ -1175,9 +1174,9 @@ function TableBody({
             ) : (
               <ChevronRight className="h-3 w-3 shrink-0" />
             )}
-            <span className="truncate">{t("resources-panel.tree.child-tables")}</span>
+            <span className="min-w-0 truncate">{t("resources-panel.tree.child-tables")}</span>
             {typeof childCount === "number" && (
-              <span className="text-muted-foreground/70 ml-auto font-mono">
+              <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
                 {childCount}
               </span>
             )}
@@ -1239,10 +1238,10 @@ function ColumnsList({
           title={`${c.name} ${c.type}${c.length ? `(${c.length})` : ""}`}
         >
           <span className="w-3 shrink-0" aria-hidden />
-          <span className="truncate font-mono">
+          <span className="min-w-0 truncate font-mono">
             {highlight(c.name, query)}
           </span>
-          <span className="text-muted-foreground/70 ml-auto shrink-0 font-mono">
+          <span className="text-muted-foreground/70 ml-auto shrink-0 whitespace-nowrap font-mono">
             {c.type}
             {c.length ? `(${c.length})` : ""}
             {c.isPrimaryTs ? " · pk" : c.isTag ? " · tag" : ""}
@@ -1306,7 +1305,7 @@ function ChildrenList({
         >
           <span className="w-3 shrink-0" aria-hidden />
           <FileText className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate font-mono">
+          <span className="min-w-0 truncate font-mono">
             {highlight(t.name, query)}
           </span>
         </div>

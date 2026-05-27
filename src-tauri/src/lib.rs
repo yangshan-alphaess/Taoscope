@@ -25,6 +25,7 @@ pub fn run() {
         // process plugin's `relaunch()` swaps the running binary in place.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let db_path = resolve_db_path(app.handle())?;
             let store = crate::datasource::state::Store::open(&db_path)

@@ -19,17 +19,13 @@ export function Toolbar() {
   const explainShortcut = fmtShortcut(["Mod", "Shift", "Enter"]);
 
   return (
-    <div className="border-border bg-background flex h-9 shrink-0 items-center gap-1 border-b px-2">
+    <div className="border-border flex h-9 shrink-0 items-center gap-1 border-b bg-gradient-to-b from-white/[0.03] to-transparent px-2">
       <ToolbarButton
         onClick={run}
         disabled={!canRun}
         title={t("toolbar.run.title", { shortcut: runShortcut })}
         icon={<Play className="h-3.5 w-3.5" />}
-        label={
-          isRunning
-            ? t("toolbar.run.running")
-            : `${t("toolbar.run.label")} ${runShortcut}`
-        }
+        label={isRunning ? t("toolbar.run.running") : t("toolbar.run.label")}
         primary
       />
       <ToolbarButton
@@ -79,10 +75,11 @@ const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
         onClick={onClick}
         disabled={disabled}
         title={title}
+        aria-label={label}
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+          "flex items-center justify-center rounded-md p-1.5 transition-colors",
           disabled
-            ? "text-muted-foreground/60 cursor-not-allowed"
+            ? "text-muted-foreground/50"
             : primary
               ? "bg-primary text-primary-foreground hover:bg-primary/90"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -91,7 +88,6 @@ const ToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(
         {...rest}
       >
         {icon}
-        <span>{label}</span>
       </button>
     );
   },

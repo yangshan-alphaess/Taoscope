@@ -123,6 +123,8 @@ export function ResultPanel() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">{body}</div>
+    <div className="border-border/70 bg-card flex h-full min-h-0 flex-col overflow-hidden rounded-lg border shadow-[0_4px_16px_-4px_rgba(0,0,0,0.45),inset_0_1px_0_0_hsl(0_0%_100%/0.05)]">
+      {body}
+    </div>
   );
 }

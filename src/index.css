@@ -14,6 +14,9 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 4%;
 
+    /* Deepest shell tier — the window frame / gutters behind floating panels. */
+    --surface-0: 240 6% 95%;
+
     --primary: 164 93% 34%; /* #06A77D */
     --primary-foreground: 0 0% 100%;
 
@@ -37,8 +40,13 @@
     /* Soft warm-neutral dark theme — Claude / VS Code style. Avoids pure
        black; surfaces are mid-grey with a faint blue undertone so the eye
        reads it as "dark UI" rather than "OLED off pixel". */
-    --background: 220 6% 13%;      /* ~#1f2022 */
+    --background: 220 6% 13%;      /* ~#1f2022 — side panels (mid tier) */
     --foreground: 220 8% 90%;      /* off-white, easier on eyes than pure white */
+
+    /* Deepest tier: the window shell / gutters that floating panels sit on.
+       A notch below --background so insets between panels read as recessed
+       seams, giving the flat layout perceptible depth. */
+    --surface-0: 220 8% 9%;
 
     --card: 220 6% 16%;            /* surfaces a notch above bg */
     --card-foreground: 220 8% 90%;

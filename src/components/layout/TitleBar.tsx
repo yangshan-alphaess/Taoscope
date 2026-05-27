@@ -66,7 +66,8 @@ export function TitleBar() {
       className={cn(
         // h-7 (~28px) matches the native macOS titlebar height, so traffic
         // lights and our centered content share the same vertical midline.
-        "bg-background border-border flex h-7 shrink-0 items-center border-b px-4 select-none",
+        // Transparent: it sits on the gradient shell as part of the frame.
+        "flex h-7 shrink-0 items-center px-4 select-none",
         isMac && "pl-20",
       )}
     >
