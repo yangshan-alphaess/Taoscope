@@ -6,6 +6,15 @@ A fast, keyboard-friendly desktop manager for **TDengine 3.x**.
 
 Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connects to TDengine over the REST API and gives you the productivity surfaces you'd expect from a modern SQL workbench, tuned for time-series specifics like super tables, child tables, and tags.
 
+> [!IMPORTANT]
+> **The installer is not yet signed — every OS will warn you the first time.** Don't be alarmed; bypass once and you're done forever.
+>
+> - **macOS** — after dragging the app to `/Applications`, run once in Terminal: `xattr -dr com.apple.quarantine /Applications/Taoscope.app` (without this, macOS Sonoma+ refuses to open it with *"Taoscope.app is damaged"*). Full details in [macOS Gatekeeper](#macos-gatekeeper) below.
+> - **Windows** — SmartScreen shows a blue dialog: click **More info** → **Run anyway**.
+> - **Linux** — just `chmod +x` the `.AppImage` or `sudo dpkg -i` / `sudo rpm -i` the package.
+>
+> Subsequent in-app auto-updates don't re-trigger any of these warnings.
+
 <p align="center">
   <img src="docs/images/ui.png" alt="Taoscope main window" width="900">
 </p>

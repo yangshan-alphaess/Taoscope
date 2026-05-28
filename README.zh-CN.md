@@ -6,6 +6,15 @@
 
 底层 Tauri 2（Rust 壳）+ React 18 —— 一个体积小巧的原生二进制，通过 REST API 直连 TDengine，提供你期望从现代 SQL 工作台得到的所有效率界面，并针对时序场景做了专门优化（super table、child table、tag 等）。
 
+> [!IMPORTANT]
+> **安装包尚未签名 —— 首次安装时各系统都会弹安全告警。** 别慌，绕过一次以后再也不会拦你。
+>
+> - **macOS** —— 把 app 拖到 `/Applications` 后，在 Terminal 跑一次：`xattr -dr com.apple.quarantine /Applications/Taoscope.app`（不做这一步，macOS Sonoma+ 会直接拒绝打开并提示 *"Taoscope.app 已损坏"*）。详见下方的 [macOS Gatekeeper](#macos-gatekeeper)。
+> - **Windows** —— SmartScreen 蓝屏对话框：点 **更多信息（More info）** → **仍要运行（Run anyway）**。
+> - **Linux** —— `.AppImage` 文件 `chmod +x` 后直接跑；或者 `sudo dpkg -i` / `sudo rpm -i` 安装包。
+>
+> 之后应用内的自动更新不会再触发任何这类告警。
+
 <p align="center">
   <img src="docs/images/ui.png" alt="Taoscope 主窗口" width="900">
 </p>
