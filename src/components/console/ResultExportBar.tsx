@@ -10,6 +10,7 @@ import {
   toCsv,
   toJson,
 } from "@/components/console/resultExport";
+import { useDisplayPrefs } from "@/state/displayPrefs";
 
 type Feedback = "idle" | "success" | "fail";
 type ButtonKey = "copyCsv" | "downloadCsv" | "copyJson" | "downloadJson";
@@ -36,6 +37,7 @@ export function ResultExportBar({
   onFilterChange: (q: string) => void;
 }) {
   const { t } = useTranslation("result");
+  const tz = useDisplayPrefs((s) => s.tz);
   const [feedback, setFeedback] = useState<Record<ButtonKey, Feedback>>({
     copyCsv: "idle",
     downloadCsv: "idle",
@@ -53,14 +55,14 @@ export function ResultExportBar({
       for (let i = 0; i < result.columns.length; i++) {
         const col = result.columns[i];
         if (!col) continue;
-        if (serializeValue(row[i], col).toLowerCase().includes(q)) {
+        if (serializeValue(row[i], col, tz).toLowerCase().includes(q)) {
           n++;
           break;
         }
       }
     }
     return n;
-  }, [filterQuery, result]);
+  }, [filterQuery, result, tz]);
 
   if (result.rows.length === 0) return null;
 
@@ -165,7 +167,7 @@ export function ResultExportBar({
       {renderButton(
         "copyCsv",
         <Copy className="h-3 w-3" />,
-        () => void handleCopy("copyCsv", toCsv(result)),
+        () => void handleCopy("copyCsv", toCsv(result, tz)),
       )}
       {renderButton(
         "downloadCsv",
@@ -173,7 +175,7 @@ export function ResultExportBar({
         () =>
           handleDownload(
             "downloadCsv",
-            toCsv(result),
+            toCsv(result, tz),
             "text/csv;charset=utf-8",
             buildFilename("csv"),
           ),
@@ -182,7 +184,7 @@ export function ResultExportBar({
       {renderButton(
         "copyJson",
         <Copy className="h-3 w-3" />,
-        () => void handleCopy("copyJson", toJson(result)),
+        () => void handleCopy("copyJson", toJson(result, tz)),
       )}
       {renderButton(
         "downloadJson",
@@ -190,7 +192,7 @@ export function ResultExportBar({
         () =>
           handleDownload(
             "downloadJson",
-            toJson(result),
+            toJson(result, tz),
             "application/json",
             buildFilename("json"),
           ),

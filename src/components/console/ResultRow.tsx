@@ -12,6 +12,7 @@ import {
   rowToTsv,
   serializeValue,
 } from "@/components/console/resultExport";
+import { useDisplayPrefs } from "@/state/displayPrefs";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -54,6 +55,7 @@ function ResultRowImpl({
   zebra,
 }: ResultRowProps) {
   const { t } = useTranslation("result");
+  const tz = useDisplayPrefs((s) => s.tz);
   // Which column the user right-clicked. Tracked via a ref because we
   // only need it at menu-open time — putting it in state would force a
   // re-render on every right-click and undo the memoization gains.
@@ -73,7 +75,7 @@ function ResultRowImpl({
     if (idx == null) return;
     const col = columns[idx];
     if (!col) return;
-    const text = serializeValue(original[idx], col);
+    const text = serializeValue(original[idx], col, tz);
     const preview = previewValue(text);
     const label =
       preview === ""
@@ -83,11 +85,11 @@ function ResultRowImpl({
   }
 
   function handleCopyTsv() {
-    copyWithToast(rowToTsv(original, columns), t("toast.copied-row"));
+    copyWithToast(rowToTsv(original, columns, tz), t("toast.copied-row"));
   }
 
   function handleCopyJson() {
-    copyWithToast(rowToJson(original, columns), t("toast.copied-row-json"));
+    copyWithToast(rowToJson(original, columns, tz), t("toast.copied-row-json"));
   }
 
   function handleCopyColumnName() {

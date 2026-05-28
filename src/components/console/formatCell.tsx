@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 import type { Column } from "@/datasource/types";
+import { formatTimestamp } from "@/lib/timezone";
+import type { TzPref } from "@/state/displayPrefs";
 
-export function formatCell(value: unknown, col: Column): ReactNode {
+export function formatCell(
+  value: unknown,
+  col: Column,
+  tz: TzPref = { kind: "utc" },
+): ReactNode {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground/60 italic">NULL</span>;
   }
@@ -9,9 +15,7 @@ export function formatCell(value: unknown, col: Column): ReactNode {
     case "TIMESTAMP":
       if (typeof value === "number") {
         return (
-          <span className="font-mono">
-            {new Date(value).toISOString()}
-          </span>
+          <span className="font-mono">{formatTimestamp(value, tz)}</span>
         );
       }
       return <span className="font-mono">{String(value)}</span>;

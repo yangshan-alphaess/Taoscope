@@ -22,14 +22,13 @@ use std::sync::Mutex;
 use crate::datasource::error::DataSourceError;
 use crate::datasource::sql_builder::{
     assemble_stables, build_count_child_tables_sql, build_count_normal_tables_sql,
-    build_count_stables_sql, build_describe_sql, build_list_child_tables_sql,
-    build_list_normal_tables_sql, parse_databases, parse_describe, parse_first_column_strings,
-    parse_scalar_count, parse_stable_count_map, parse_stable_names, SQL_SHOW_DATABASES,
-    SQL_SHOW_STABLES,
+    build_describe_sql, build_list_child_tables_sql, build_list_normal_tables_sql,
+    derive_total_from_short_page, parse_databases, parse_describe, parse_first_column_strings,
+    parse_scalar_count, parse_stable_names, SQL_SHOW_DATABASES, SQL_SHOW_STABLES,
 };
 use crate::datasource::types::{
-    AuthMode, Column, Connection, Database, ListTablesOpts, Paged, Protocol, QueryResult, STable,
-    Table, TestConnectionResult,
+    AuthMode, Column, Connection, CountTablesOpts, Database, ListTablesOpts, Paged, Protocol,
+    QueryResult, STable, Table, TestConnectionResult,
 };
 
 // ── Connection pool ─────────────────────────────────────────────────────
@@ -296,14 +295,7 @@ pub async fn list_stables(
     let timeout_ms = effective_timeout(conn);
     let result = run(&taos, timeout_ms, Some(db), SQL_SHOW_STABLES).await?;
     let names = parse_stable_names(&result.columns, &result.rows);
-
-    let count_sql = build_count_stables_sql(db);
-    let counts = match run(&taos, timeout_ms, None, &count_sql).await {
-        Ok(count_resp) => parse_stable_count_map(&count_resp.columns, &count_resp.rows),
-        Err(_) => HashMap::new(),
-    };
-
-    Ok(assemble_stables(names, &counts))
+    Ok(assemble_stables(names))
 }
 
 pub async fn list_tables(
@@ -338,12 +330,11 @@ pub async fn list_tables(
                 stable_name: Some(stable.clone()),
             })
             .collect();
-        let count_sql =
-            build_count_child_tables_sql(db, stable, opts.search.as_deref());
-        let total = match run(&taos, timeout_ms, None, &count_sql).await {
-            Ok(resp) => parse_scalar_count(&resp.rows).unwrap_or(0),
-            Err(_) => items.len() as u32,
-        };
+        // Skip the explicit `COUNT(*)` round-trip — it's a full scan of
+        // `information_schema.ins_tables` and dominates the latency. Only
+        // fall through to a definite total when the page came back short,
+        // because that proves there are no further rows.
+        let total = derive_total_from_short_page(items.len() as u32, page_size, offset);
         return Ok(Paged {
             items,
             total,
@@ -364,17 +355,39 @@ pub async fn list_tables(
         })
         .collect();
 
-    let count_sql = build_count_normal_tables_sql(db, opts.search.as_deref());
-    let total = match run(&taos, timeout_ms, None, &count_sql).await {
-        Ok(resp) => parse_scalar_count(&resp.rows).unwrap_or(0),
-        Err(_) => items.len() as u32,
-    };
+    let total = derive_total_from_short_page(items.len() as u32, page_size, offset);
     Ok(Paged {
         items,
         total,
         page,
         page_size,
     })
+}
+
+/// Run only the `COUNT(*)` query for child tables (when `opts.stable` is set)
+/// or normal tables (otherwise). Returns 0 when the count cell can't be
+/// parsed — callers treat this as "unknown" but should still propagate it
+/// to the UI rather than fall back to a synthesised number.
+pub async fn count_tables(
+    conn: &Connection,
+    db: &str,
+    opts: &CountTablesOpts,
+) -> Result<u32, DataSourceError> {
+    if let Some(search) = &opts.search {
+        if search.contains(';') {
+            return Err(DataSourceError::Other(
+                "invalid search character: ';'".into(),
+            ));
+        }
+    }
+    let taos = get_or_connect(conn).await?;
+    let timeout_ms = effective_timeout(conn);
+    let sql = match &opts.stable {
+        Some(stable) => build_count_child_tables_sql(db, stable, opts.search.as_deref()),
+        None => build_count_normal_tables_sql(db, opts.search.as_deref()),
+    };
+    let resp = run(&taos, timeout_ms, None, &sql).await?;
+    Ok(parse_scalar_count(&resp.rows).unwrap_or(0))
 }
 
 pub async fn describe_table(

@@ -99,12 +99,14 @@
       "no-matches": "无匹配项。",
       "columns-tags": "列与标签",
       "child-tables": "子表",
+      "child-count-tooltip": "点击刷新子表和总数",
       "no-columns": "暂无列。",
       "no-child-tables": "暂无子表。",
       "failed-columns": "加载列失败。",
       "disconnected": "未连接",
-      "stable-badge": "超级表 · {{count}}",
-      "load-more": "+ 再加载 {{n}} 个（剩余 {{remaining}}）"
+      "stable-badge": "超级表",
+      "load-more": "+ 再加载 {{n}} 个（剩余 {{remaining}}）",
+      "load-more-unknown": "+ 再加载 {{n}} 个"
     }
   }
 }

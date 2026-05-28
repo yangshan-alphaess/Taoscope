@@ -18,6 +18,7 @@ import type {
   Database,
   DataSource,
   HistoryEntry,
+  CountTablesOpts,
   ListTablesOpts,
   Paged,
   QueryResult,
@@ -283,6 +284,15 @@ export class MockDataSource implements DataSource {
   ): Promise<Paged<Table>> {
     await tick();
     return { items: [], total: 0, page: opts.page, pageSize: opts.pageSize };
+  }
+
+  async countTables(
+    _connId: string,
+    _db: string,
+    _opts: CountTablesOpts,
+  ): Promise<number> {
+    await tick();
+    return 0;
   }
 
   async describeTable(

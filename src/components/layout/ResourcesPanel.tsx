@@ -152,7 +152,7 @@ function TreeRowMenu({
         <button
           type="button"
           onClick={(e) => e.stopPropagation()}
-          className="invisible mr-1 shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:visible group-hover:visible data-[state=open]:visible"
+          className="hidden mr-1 shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:flex group-hover:flex data-[state=open]:flex"
           aria-label={t("resources-panel.tooltip.actions-for", { name })}
           title={t("resources-panel.tooltip.actions-for", { name })}
         >
@@ -256,7 +256,12 @@ type ColumnsState = Column[] | "loading" | "error";
 
 interface ChildLoadState {
   items: Table[];
-  total: number;
+  /** Definite total once known (last page came back short, or the async
+   *  `countTables` round-trip resolved). `undefined` while the total is
+   *  unknown — usually paired with `countLoading: true`. */
+  total?: number;
+  /** True while the async `countTables` query is in flight. */
+  countLoading: boolean;
   nextPage: number;
   loading: boolean;
   error: string | null;
@@ -607,6 +612,29 @@ export function ResourcesPanel() {
     setChildrenByStable((prev) => dropPrefix(prev, prefix));
   }
 
+  /** Drop every entry in a Set whose key starts with the given prefix. Used
+   *  to cascade-collapse all descendants when a parent is collapsed or its
+   *  connection is refreshed — we deliberately discard the prior expanded
+   *  state so re-opening shows a clean fully-collapsed sub-tree. */
+  function pruneExpandedByPrefix(prefix: string) {
+    const drop = (prev: Set<string>) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const k of prev) {
+        if (k.startsWith(prefix)) {
+          changed = true;
+          continue;
+        }
+        next.add(k);
+      }
+      return changed ? next : prev;
+    };
+    setExpandedDbs(drop);
+    setExpandedTables(drop);
+    setExpandedColumns(drop);
+    setExpandedChildren(drop);
+  }
+
   async function handleDeleteConnection(c: Connection) {
     const consoleCount = consoles.filter((k) => k.connectionId === c.id).length;
     const ok = await confirm({
@@ -636,6 +664,10 @@ export function ResourcesPanel() {
       return;
     }
     clearConnCache(c.id);
+    // Refresh wipes every cached descendant; collapse the matching expand
+    // state so the user gets a clean re-render rather than empty placeholders
+    // for the previously-expanded nodes.
+    pruneExpandedByPrefix(`${c.id}|`);
     setExpandedConns((prev) => {
       if (prev.has(c.id)) return prev;
       const next = new Set(prev);
@@ -668,6 +700,8 @@ export function ResourcesPanel() {
         Object.entries(prev).filter(([k]) => !k.startsWith(dropDbPrefix)),
       ),
     );
+    // Collapse every descendant of this database; re-expanding starts fresh.
+    pruneExpandedByPrefix(dropDbPrefix);
     setStablesByDb((prev) => ({ ...prev, [key]: "loading" }));
     setTablesByDb((prev) => ({ ...prev, [key]: "loading" }));
 
@@ -685,21 +719,6 @@ export function ResourcesPanel() {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(msg);
     }
-
-    // We cleared the column / child-table caches above; any node that is
-    // currently expanded would otherwise be stuck on "loading" until the user
-    // collapses and re-opens it (its load only fires on the open transition).
-    // Force-reload the expanded ones so a schema change shows immediately.
-    for (const k of expandedColumns) {
-      if (!k.startsWith(dropDbPrefix)) continue;
-      const [cId, d, table] = k.split("|");
-      if (cId && d && table) void loadColumns(cId, d, table, true);
-    }
-    for (const k of expandedChildren) {
-      if (!k.startsWith(dropDbPrefix)) continue;
-      const [cId, d, stable] = k.split("|");
-      if (cId && d && stable) void loadChildren(cId, d, stable, true);
-    }
   }
 
   async function toggleConn(c: Connection) {
@@ -710,7 +729,12 @@ export function ResourcesPanel() {
       else next.add(c.id);
       return next;
     });
-    if (isOpen) return;
+    if (isOpen) {
+      // Collapsing the connection cascades collapse to every descendant —
+      // next time the user expands, the sub-tree starts fully collapsed.
+      pruneExpandedByPrefix(`${c.id}|`);
+      return;
+    }
     if (c.status === "offline") return;
     if (dbsByConn[c.id]) return;
     setDbsByConn((prev) => ({ ...prev, [c.id]: "loading" }));
@@ -731,7 +755,10 @@ export function ResourcesPanel() {
       else next.add(key);
       return next;
     });
-    if (isOpen) return;
+    if (isOpen) {
+      pruneExpandedByPrefix(`${key}|`);
+      return;
+    }
     if (stablesByDb[key] || tablesByDb[key]) return;
     setStablesByDb((prev) => ({ ...prev, [key]: "loading" }));
     setTablesByDb((prev) => ({ ...prev, [key]: "loading" }));
@@ -750,12 +777,29 @@ export function ResourcesPanel() {
 
   function toggleTable(connId: string, db: string, table: string) {
     const key = `${connId}|${db}|${table}`;
+    const wasOpen = expandedTables.has(key);
     setExpandedTables((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
+      if (wasOpen) next.delete(key);
       else next.add(key);
       return next;
     });
+    if (wasOpen) {
+      // Collapsing the table row also collapses its Columns & tags / Child
+      // tables panes — re-opening should start cleanly closed.
+      setExpandedColumns((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+      setExpandedChildren((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   }
 
   function toggleColumns(connId: string, db: string, table: string) {
@@ -814,7 +858,8 @@ export function ResourcesPanel() {
       ...prev,
       [key]: {
         items: [],
-        total: 0,
+        total: undefined,
+        countLoading: false,
         nextPage: 1,
         loading: true,
         error: null,
@@ -826,22 +871,49 @@ export function ResourcesPanel() {
         page: 1,
         pageSize: CHILD_PAGE_SIZE,
       });
+      // Full page back → kick off the async COUNT(*) so the badge fills in
+      // later without blocking the items render. Short page → total is
+      // already definite and equals items.length.
+      const needsCount = paged.total === undefined;
       setChildrenByStable((prev) => ({
         ...prev,
         [key]: {
           items: paged.items,
           total: paged.total,
+          countLoading: needsCount,
           nextPage: 2,
           loading: false,
           error: null,
         },
       }));
+      if (needsCount) {
+        void (async () => {
+          try {
+            const total = await ds.countTables(connId, db, { stable });
+            setChildrenByStable((prev) => {
+              const cur = prev[key];
+              if (!cur) return prev;
+              return {
+                ...prev,
+                [key]: { ...cur, total, countLoading: false },
+              };
+            });
+          } catch {
+            setChildrenByStable((prev) => {
+              const cur = prev[key];
+              if (!cur) return prev;
+              return { ...prev, [key]: { ...cur, countLoading: false } };
+            });
+          }
+        })();
+      }
     } catch {
       setChildrenByStable((prev) => ({
         ...prev,
         [key]: {
           items: [],
-          total: 0,
+          total: undefined,
+          countLoading: false,
           nextPage: 1,
           loading: false,
           error: t("resources-panel.tree.error"),
@@ -854,7 +926,7 @@ export function ResourcesPanel() {
     const key = `${connId}|${db}|${stable}`;
     const state = childrenByStable[key];
     if (!state || state.loading) return;
-    if (state.items.length >= state.total) return;
+    if (state.total !== undefined && state.items.length >= state.total) return;
     setChildrenByStable((prev) => {
       const cur = prev[key];
       if (!cur) return prev;
@@ -869,11 +941,16 @@ export function ResourcesPanel() {
       setChildrenByStable((prev) => {
         const cur = prev[key];
         if (!cur) return prev;
+        // A subsequent page coming back short upgrades us from "unknown" to
+        // a definite total — adopt it. Otherwise keep whatever total we had
+        // (the async count may already have populated it).
+        const total = paged.total !== undefined ? paged.total : cur.total;
         return {
           ...prev,
           [key]: {
+            ...cur,
             items: [...cur.items, ...paged.items],
-            total: paged.total,
+            total,
             nextPage: cur.nextPage + 1,
             loading: false,
             error: null,
@@ -1080,7 +1157,7 @@ export function ResourcesPanel() {
                             <button
                               type="button"
                               onClick={(e) => e.stopPropagation()}
-                              className="invisible mr-1 shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:visible group-hover:visible data-[state=open]:visible"
+                              className="hidden mr-1 shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:flex group-hover:flex data-[state=open]:flex"
                               aria-label={t(
                                 "resources-panel.tooltip.actions-for",
                                 {
@@ -1371,7 +1448,7 @@ function ConnectionBody({
                       e.stopPropagation();
                       onOpenConsoleForDb(conn.id, db.name);
                     }}
-                    className="invisible shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:visible group-hover:visible"
+                    className="hidden shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:flex group-hover:flex"
                     aria-label={t("resources-panel.tooltip.open-console", {
                       name: db.name,
                     })}
@@ -1386,7 +1463,7 @@ function ConnectionBody({
                       <button
                         type="button"
                         onClick={(e) => e.stopPropagation()}
-                        className="invisible mr-1 shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:visible group-hover:visible data-[state=open]:visible"
+                        className="hidden mr-1 shrink-0 rounded-sm p-1 text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground focus-visible:flex group-hover:flex data-[state=open]:flex"
                         aria-label={t("resources-panel.tooltip.actions-for", {
                           name: db.name,
                         })}
@@ -1578,9 +1655,7 @@ function DatabaseBody({
                       {highlight(stb.name, query)}
                     </span>
                     <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-muted-foreground/70">
-                      {tr("resources-panel.tree.stable-badge", {
-                        count: stb.childCount,
-                      })}
+                      {tr("resources-panel.tree.stable-badge")}
                     </span>
                   </div>
                   <TreeRowMenu name={stb.name} actions={stableActions} />
@@ -1596,7 +1671,6 @@ function DatabaseBody({
                 dbName={dbName}
                 tableName={stb.name}
                 isStable
-                childCount={stb.childCount}
                 editArgs={editArgs}
                 query={query}
                 filterActive={filterActive}
@@ -1729,7 +1803,6 @@ interface TableBodyProps {
   dbName: string;
   tableName: string;
   isStable: boolean;
-  childCount?: number;
   editArgs: OpenDesignerArgs;
   query: string;
   filterActive: boolean;
@@ -1752,7 +1825,6 @@ function TableBody({
   dbName,
   tableName,
   isStable,
-  childCount,
   editArgs,
   query,
   filterActive,
@@ -1875,11 +1947,35 @@ function TableBody({
                   <span className="min-w-0 truncate">
                     {t("resources-panel.tree.child-tables")}
                   </span>
-                  {typeof childCount === "number" && (
-                    <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-muted-foreground/70">
-                      {childCount}
-                    </span>
-                  )}
+                  {(() => {
+                    const cs = childrenByStable[key];
+                    if (!cs || cs.loading || cs.error) return null;
+                    if (cs.total === undefined && !cs.countLoading) return null;
+                    const label = cs.countLoading ? "…" : String(cs.total);
+                    // Use a CSS-only group-hover tooltip rather than the
+                    // native `title` attribute so the hint appears with no
+                    // browser-imposed 500ms+ delay.
+                    return (
+                      <span className="group/count relative ml-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRefreshChildren(connId, dbName, tableName);
+                          }}
+                          aria-label={t(
+                            "resources-panel.tree.child-count-tooltip",
+                          )}
+                          className="whitespace-nowrap rounded-sm px-1 font-mono text-muted-foreground/70 hover:bg-muted/40 hover:text-foreground"
+                        >
+                          {label}
+                        </button>
+                        <span className="pointer-events-none invisible absolute right-0 top-full z-50 mt-1 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-[11px] text-popover-foreground shadow-md group-hover/count:visible">
+                          {t("resources-panel.tree.child-count-tooltip")}
+                        </span>
+                      </span>
+                    );
+                  })()}
                 </div>
                 <TreeRowMenu
                   name={t("resources-panel.tree.child-tables")}
@@ -2051,7 +2147,13 @@ function ChildrenList({
       </div>
     );
   }
-  const remaining = state.total - state.items.length;
+  // `state.total` is `undefined` when the backend skipped the COUNT scan
+  // and the last page came back full — we know there might be more, but
+  // not how many. `remaining === undefined` in that case; the load-more
+  // button is shown without a remaining-count suffix.
+  const remaining =
+    state.total !== undefined ? state.total - state.items.length : undefined;
+  const hasMore = remaining === undefined || remaining > 0;
   return (
     <div>
       {state.items.map((t) => {
@@ -2112,17 +2214,21 @@ function ChildrenList({
           {tr("resources-panel.tree.loading")}
         </p>
       )}
-      {remaining > 0 && !state.loading && (
+      {hasMore && !state.loading && (
         <button
           type="button"
           onClick={onLoadMore}
           style={indentStyle(4)}
           className="w-full py-1 pr-3 text-left text-[11px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
         >
-          {tr("resources-panel.tree.load-more", {
-            n: CHILD_PAGE_SIZE,
-            remaining,
-          })}
+          {remaining !== undefined
+            ? tr("resources-panel.tree.load-more", {
+                n: CHILD_PAGE_SIZE,
+                remaining,
+              })
+            : tr("resources-panel.tree.load-more-unknown", {
+                n: CHILD_PAGE_SIZE,
+              })}
         </button>
       )}
     </div>

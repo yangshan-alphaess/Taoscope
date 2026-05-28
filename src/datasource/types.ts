@@ -92,8 +92,12 @@ export interface STable {
   columns: Column[];
   /** Tag columns. */
   tagColumns: Column[];
-  /** Total number of child tables under this super table. */
-  childCount: number;
+  /**
+   * Total number of child tables. `undefined` until the children pane has
+   * been expanded at least once — listing super tables intentionally skips
+   * the `COUNT(*)` round-trip so DB refresh stays cheap.
+   */
+  childCount?: number;
 }
 
 export interface Table {
@@ -121,8 +125,14 @@ export interface QueryResult {
 
 export interface Paged<T> {
   items: T[];
-  /** Total items matching the filter (not page size). */
-  total: number;
+  /**
+   * Definite total when known: either the last page came back short (so
+   * `offset + items.length` is the truth) or the caller explicitly asked
+   * for it. `undefined` means "unknown — the backend skipped the COUNT(*)
+   * scan", and the UI should hide the badge until a future page proves
+   * the total or the user requests it explicitly.
+   */
+  total?: number;
   /** 1-based page index. */
   page: number;
   pageSize: number;
@@ -136,6 +146,13 @@ export interface ListTablesOpts {
   /** Page size (required). */
   pageSize: number;
   /** Substring filter on table name. */
+  search?: string;
+}
+
+/** Pagination-free filter for the standalone `countTables` call — counts are
+ *  taken over the entire matching set, so page/pageSize would be misleading. */
+export interface CountTablesOpts {
+  stable?: string;
   search?: string;
 }
 
@@ -185,6 +202,17 @@ export interface DataSource {
     db: string,
     opts: ListTablesOpts,
   ): Promise<Paged<Table>>;
+  /**
+   * Run only the `COUNT(*)` query for child / normal tables. Decoupled from
+   * `listTables` so the items can render first and the count fills in
+   * asynchronously — counting `information_schema.ins_tables` is a full scan
+   * and can be slow.
+   */
+  countTables(
+    connId: string,
+    db: string,
+    opts: CountTablesOpts,
+  ): Promise<number>;
   describeTable(connId: string, db: string, table: string): Promise<Column[]>;
 
   runSql(

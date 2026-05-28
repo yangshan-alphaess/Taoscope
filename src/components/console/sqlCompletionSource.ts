@@ -80,7 +80,7 @@ async function buildTableCompletions(
     ...stables.map<Completion>((s) => ({
       label: s.name,
       type: "class",
-      detail: `STable · ${s.childCount}`,
+      detail: "STable",
       boost: 5,
     })),
     ...tables.map<Completion>((t) => ({

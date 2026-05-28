@@ -42,6 +42,26 @@
       "empty": "No databases.",
       "clear": "Clear binding",
       "locate": "Reveal this database in the resource tree"
+    },
+    "timezone": {
+      "title": "Display timezone for TIMESTAMP columns",
+      "label": "Display timezone",
+      "trigger-label-system": "System",
+      "trigger-label-utc": "UTC",
+      "preset": {
+        "system": "Use system",
+        "system-suffix": "(default)",
+        "utc": "UTC",
+        "shanghai": "+08:00 Asia/Shanghai",
+        "tokyo": "+09:00 Asia/Tokyo",
+        "kolkata": "+05:30 Asia/Kolkata"
+      },
+      "custom": {
+        "open": "Custom offset…",
+        "placeholder": "±HH:mm",
+        "apply": "Apply",
+        "invalid": "Enter ±HH:mm between -12:00 and +14:00"
+      }
     }
   },
   "consoles-panel": {

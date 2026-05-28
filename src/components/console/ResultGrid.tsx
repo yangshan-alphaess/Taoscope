@@ -23,6 +23,8 @@ import { useAppState } from "@/store/appState";
 import { formatCell } from "@/components/console/formatCell";
 import { ResultRow } from "@/components/console/ResultRow";
 import { columnToText, serializeValue } from "@/components/console/resultExport";
+import { useDisplayPrefs } from "@/state/displayPrefs";
+import type { TzPref } from "@/state/displayPrefs";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -103,7 +105,7 @@ function estimateInitialSize(col: Column): number {
   return Math.max(80, Math.min(320, Math.max(headerWidth, typeWidth)));
 }
 
-function buildColumnDefs(columns: Column[]): ColumnDef<Row>[] {
+function buildColumnDefs(columns: Column[], tz: TzPref): ColumnDef<Row>[] {
   return columns.map((col, idx) => ({
     id: col.name,
     accessorFn: (row: Row) => row[idx],
@@ -116,7 +118,7 @@ function buildColumnDefs(columns: Column[]): ColumnDef<Row>[] {
         </span>
       </div>
     ),
-    cell: (info) => formatCell(info.getValue(), col),
+    cell: (info) => formatCell(info.getValue(), col, tz),
     sortingFn: sortingFnForColumn(col),
     size: estimateInitialSize(col),
     minSize: 64,
@@ -138,10 +140,11 @@ export function ResultGrid({
       activeId ? s.consoleRuntime[activeId]?.gridState : undefined,
     ) ?? EMPTY_GRID_STATE;
   const setGridState = useAppState((s) => s.setGridState);
+  const tz = useDisplayPrefs((s) => s.tz);
 
   const columns = useMemo(
-    () => buildColumnDefs(result.columns),
-    [result.columns],
+    () => buildColumnDefs(result.columns, tz),
+    [result.columns, tz],
   );
 
   const globalFilterFn = useMemo<FilterFn<Row>>(
@@ -153,13 +156,13 @@ export function ResultGrid({
       for (let i = 0; i < result.columns.length; i++) {
         const col = result.columns[i];
         if (!col) continue;
-        if (serializeValue(original[i], col).toLowerCase().includes(needle)) {
+        if (serializeValue(original[i], col, tz).toLowerCase().includes(needle)) {
           return true;
         }
       }
       return false;
     },
-    [result.columns],
+    [result.columns, tz],
   );
 
   const table = useReactTable<Row>({
@@ -243,7 +246,7 @@ export function ResultGrid({
 
                 function copyColumnValues() {
                   if (!col || colIdx < 0) return;
-                  const text = columnToText(result.rows, colIdx, col);
+                  const text = columnToText(result.rows, colIdx, col, tz);
                   navigator.clipboard
                     .writeText(text)
                     .then(() =>

@@ -100,12 +100,14 @@
       "no-matches": "No matches.",
       "columns-tags": "Columns & tags",
       "child-tables": "Child tables",
+      "child-count-tooltip": "Click to refresh child tables and count",
       "no-columns": "No columns.",
       "no-child-tables": "No child tables.",
       "failed-columns": "Failed to load columns.",
       "disconnected": "Disconnected",
-      "stable-badge": "STable · {{count}}",
-      "load-more": "+ Load {{n}} more ({{remaining}} remaining)"
+      "stable-badge": "STable",
+      "load-more": "+ Load {{n}} more ({{remaining}} remaining)",
+      "load-more-unknown": "+ Load {{n}} more"
     }
   }
 }

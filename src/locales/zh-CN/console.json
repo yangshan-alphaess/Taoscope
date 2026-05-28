@@ -42,6 +42,26 @@
       "empty": "暂无数据库。",
       "clear": "清除绑定",
       "locate": "在资源树中定位该数据库"
+    },
+    "timezone": {
+      "title": "TIMESTAMP 列的显示时区",
+      "label": "显示时区",
+      "trigger-label-system": "系统",
+      "trigger-label-utc": "UTC",
+      "preset": {
+        "system": "跟随系统",
+        "system-suffix": "(默认)",
+        "utc": "UTC",
+        "shanghai": "+08:00 上海",
+        "tokyo": "+09:00 东京",
+        "kolkata": "+05:30 加尔各答"
+      },
+      "custom": {
+        "open": "自定义偏移…",
+        "placeholder": "±HH:mm",
+        "apply": "应用",
+        "invalid": "请输入 -12:00 至 +14:00 之间的 ±HH:mm"
+      }
     }
   },
   "consoles-panel": {

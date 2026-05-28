@@ -148,7 +148,11 @@ pub struct STable {
     pub name: String,
     pub columns: Vec<Column>,
     pub tag_columns: Vec<Column>,
-    pub child_count: u32,
+    /// Number of child tables. `None` when not yet computed — listing super
+    /// tables no longer triggers the `COUNT(*)` round-trip; the count is filled
+    /// in lazily when the user expands the children pane.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub child_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,7 +168,12 @@ pub struct Table {
 #[serde(rename_all = "camelCase")]
 pub struct Paged<T> {
     pub items: Vec<T>,
-    pub total: u32,
+    /// Definite total when known: either the last page short-circuited (item
+    /// count < page_size, so `offset + items.len()` is the truth) or the
+    /// caller explicitly asked for it. `None` means "unknown — too expensive
+    /// to scan, the UI should hide the badge".
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub total: Option<u32>,
     pub page: u32,
     pub page_size: u32,
 }
@@ -177,6 +186,19 @@ pub struct ListTablesOpts {
     pub page: u32,
     pub page_size: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<String>,
+}
+
+/// Pagination-free filter for the standalone `count_tables` command. We keep
+/// it separate from `ListTablesOpts` so callers can't accidentally believe
+/// `page` / `pageSize` affect a `COUNT(*)` (they don't — the count is over
+/// the entire matching set).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CountTablesOpts {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stable: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub search: Option<String>,
 }
 

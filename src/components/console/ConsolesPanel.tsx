@@ -6,6 +6,7 @@ import { useAppState } from "@/store/appState";
 import { cn } from "@/lib/utils";
 import { fmtShortcut } from "@/lib/platform";
 import { RenamableLabel } from "@/components/console/RenamableLabel";
+import { TimezonePicker } from "@/components/console/TimezonePicker";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
 import { confirm } from "@/components/ui/confirm";
 import {
@@ -75,10 +76,12 @@ export function ConsolesPanel() {
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-background shadow-[0_2px_8px_-2px_rgba(0,0,0,0.35),inset_0_1px_0_0_hsl(0_0%_100%/0.04)]">
-      <div className="flex h-9 shrink-0 items-center border-b border-border bg-gradient-to-b from-white/[0.03] to-transparent px-3">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-gradient-to-b from-white/[0.03] to-transparent px-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide">
           {t("consoles-panel.title")}
         </h2>
+        <div className="flex-1" />
+        <TimezonePicker />
       </div>
       <div className="flex-1 overflow-y-auto py-1 text-xs">
         {connections.length === 0 ? (
@@ -187,7 +190,7 @@ export function ConsolesPanel() {
                                         e.stopPropagation();
                                         setRenamingId(c.id);
                                       }}
-                                      className="ml-1 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                      className="ml-1 rounded-sm p-0.5 hidden transition-opacity hover:bg-muted group-hover:inline-flex"
                                       aria-label={t(
                                         "consoles-panel.rename-tooltip",
                                       )}
@@ -201,7 +204,7 @@ export function ConsolesPanel() {
                                         e.stopPropagation();
                                         void handleDelete(c.id);
                                       }}
-                                      className="rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                                      className="rounded-sm p-0.5 hidden transition-opacity hover:bg-muted group-hover:inline-flex"
                                       aria-label={t(
                                         "consoles-panel.delete-tooltip",
                                       )}

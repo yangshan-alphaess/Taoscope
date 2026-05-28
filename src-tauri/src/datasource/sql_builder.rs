@@ -5,8 +5,6 @@
 // tuples through the same parser helpers — keeping the two clients
 // behaviourally identical.
 
-use std::collections::HashMap;
-
 use serde_json::Value as JsonValue;
 
 use crate::datasource::types::{Column, Database, STable};
@@ -31,14 +29,6 @@ pub fn sql_str(s: &str) -> String {
 pub const SQL_SHOW_DATABASES: &str = "SHOW DATABASES";
 pub const SQL_SHOW_STABLES: &str = "SHOW STABLES";
 pub const SQL_SERVER_VERSION: &str = "SELECT SERVER_VERSION()";
-
-pub fn build_count_stables_sql(db: &str) -> String {
-    format!(
-        "SELECT stable_name, COUNT(*) AS c FROM information_schema.ins_tables \
-         WHERE db_name = {} GROUP BY stable_name",
-        sql_str(db)
-    )
-}
 
 pub fn build_list_child_tables_sql(
     db: &str,
@@ -211,39 +201,17 @@ pub fn parse_stable_names(columns: &[Column], rows: &[Vec<JsonValue>]) -> Vec<St
         .collect()
 }
 
-/// Parse the `stable_name, COUNT(*)` child-count query into a lookup map.
-pub fn parse_stable_count_map(
-    columns: &[Column],
-    rows: &[Vec<JsonValue>],
-) -> HashMap<String, u32> {
-    let mut map = HashMap::new();
-    let cn = col_index(columns, "stable_name");
-    let cc = col_index(columns, "c").or_else(|| col_index(columns, "count(*)"));
-    if let (Some(cn), Some(cc)) = (cn, cc) {
-        for row in rows {
-            if let (Some(name), Some(count)) = (
-                row.get(cn).and_then(cell_to_string),
-                row.get(cc).and_then(cell_to_u32),
-            ) {
-                map.insert(name, count);
-            }
-        }
-    }
-    map
-}
-
-/// Combine super-table names with their child counts.
-pub fn assemble_stables(names: Vec<String>, counts: &HashMap<String, u32>) -> Vec<STable> {
+/// Build `STable` entries from super-table names. `child_count` stays `None`
+/// because listing super tables intentionally skips the `COUNT(*)` round-trip
+/// — counts are filled in lazily when the children pane expands.
+pub fn assemble_stables(names: Vec<String>) -> Vec<STable> {
     names
         .into_iter()
-        .map(|name| {
-            let child_count = *counts.get(&name).unwrap_or(&0);
-            STable {
-                name,
-                columns: vec![],
-                tag_columns: vec![],
-                child_count,
-            }
+        .map(|name| STable {
+            name,
+            columns: vec![],
+            tag_columns: vec![],
+            child_count: None,
         })
         .collect()
 }
@@ -258,6 +226,24 @@ pub fn parse_first_column_strings(rows: &[Vec<JsonValue>]) -> Vec<String> {
 /// First cell of the first row as a count (COUNT(*) queries).
 pub fn parse_scalar_count(rows: &[Vec<JsonValue>]) -> Option<u32> {
     rows.first().and_then(|r| r.first()).and_then(cell_to_u32)
+}
+
+/// Derive a definite paginated total from a short page response. When the
+/// items query returns fewer rows than `page_size`, there cannot be more
+/// rows past this page — total is exactly `offset + items_len`. When the
+/// page came back full, we can't conclude anything cheaply; return `None`
+/// and let the UI hide the badge until the user reaches the end (or
+/// explicitly asks for a count).
+pub fn derive_total_from_short_page(
+    items_len: u32,
+    page_size: u32,
+    offset: u32,
+) -> Option<u32> {
+    if items_len < page_size {
+        Some(offset + items_len)
+    } else {
+        None
+    }
 }
 
 /// Parse `DESCRIBE` rows into columns, flagging tags and the primary timestamp.

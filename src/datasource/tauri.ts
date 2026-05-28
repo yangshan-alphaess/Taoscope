@@ -9,6 +9,7 @@ import type {
   Database,
   DataSource,
   HistoryEntry,
+  CountTablesOpts,
   ListTablesOpts,
   Paged,
   QueryResult,
@@ -58,6 +59,14 @@ export class TauriDataSource implements DataSource {
     opts: ListTablesOpts,
   ): Promise<Paged<Table>> {
     return invoke<Paged<Table>>("list_tables", { connId, db, opts });
+  }
+
+  async countTables(
+    connId: string,
+    db: string,
+    opts: CountTablesOpts,
+  ): Promise<number> {
+    return invoke<number>("count_tables", { connId, db, opts });
   }
 
   async describeTable(

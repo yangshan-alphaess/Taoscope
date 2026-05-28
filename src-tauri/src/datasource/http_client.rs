@@ -5,7 +5,6 @@
 // rows}` envelope. A process-wide `OnceLock<reqwest::Client>` reuses TCP /
 // TLS pools across invocations.
 
-use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
@@ -18,14 +17,14 @@ use serde_json::Value as JsonValue;
 use crate::datasource::error::DataSourceError;
 use crate::datasource::sql_builder::{
     assemble_stables, build_count_child_tables_sql, build_count_normal_tables_sql,
-    build_count_stables_sql, build_describe_sql, build_list_child_tables_sql,
-    build_list_normal_tables_sql, cell_to_string, cell_to_u32, parse_columns, parse_databases,
-    parse_describe, parse_first_column_strings, parse_scalar_count, parse_stable_count_map,
-    parse_stable_names, SQL_SERVER_VERSION, SQL_SHOW_DATABASES, SQL_SHOW_STABLES,
+    build_describe_sql, build_list_child_tables_sql, build_list_normal_tables_sql, cell_to_string,
+    cell_to_u32, derive_total_from_short_page, parse_columns, parse_databases, parse_describe,
+    parse_first_column_strings, parse_scalar_count, parse_stable_names, SQL_SERVER_VERSION,
+    SQL_SHOW_DATABASES, SQL_SHOW_STABLES,
 };
 use crate::datasource::types::{
-    AuthMode, Column, Connection, Database, ListTablesOpts, Paged, QueryResult, STable, Table,
-    TestConnectionResult,
+    AuthMode, Column, Connection, CountTablesOpts, Database, ListTablesOpts, Paged, QueryResult,
+    STable, Table, TestConnectionResult,
 };
 
 /// Default per-request timeout for HTTP REST calls; `Connection.timeout_ms`
@@ -173,18 +172,7 @@ pub async fn list_stables(
     let resp = execute_sql(conn, Some(db), SQL_SHOW_STABLES).await?;
     let columns = parse_columns(&resp.column_meta);
     let names = parse_stable_names(&columns, &resp.data);
-
-    // One follow-up query to fetch child counts grouped by stable.
-    let count_sql = build_count_stables_sql(db);
-    let counts = match execute_sql(conn, None, &count_sql).await {
-        Ok(count_resp) => {
-            let cols = parse_columns(&count_resp.column_meta);
-            parse_stable_count_map(&cols, &count_resp.data)
-        }
-        Err(_) => HashMap::new(),
-    };
-
-    Ok(assemble_stables(names, &counts))
+    Ok(assemble_stables(names))
 }
 
 pub async fn list_tables(
@@ -226,12 +214,7 @@ pub async fn list_tables(
             })
             .collect();
 
-        let count_sql =
-            build_count_child_tables_sql(db, stable, opts.search.as_deref());
-        let total = match execute_sql(conn, None, &count_sql).await {
-            Ok(resp) => parse_scalar_count(&resp.data).unwrap_or(0),
-            Err(_) => items.len() as u32,
-        };
+        let total = derive_total_from_short_page(items.len() as u32, page_size, offset);
 
         return Ok(Paged {
             items,
@@ -258,11 +241,7 @@ pub async fn list_tables(
         })
         .collect();
 
-    let count_sql = build_count_normal_tables_sql(db, opts.search.as_deref());
-    let total = match execute_sql(conn, None, &count_sql).await {
-        Ok(resp) => parse_scalar_count(&resp.data).unwrap_or(0),
-        Err(_) => items.len() as u32,
-    };
+    let total = derive_total_from_short_page(items.len() as u32, page_size, offset);
 
     Ok(Paged {
         items,
@@ -270,6 +249,28 @@ pub async fn list_tables(
         page,
         page_size,
     })
+}
+
+/// Run only the `COUNT(*)` query for child / normal tables (mirrors the ws
+/// client's `count_tables`). Returns 0 when the count cell can't be parsed.
+pub async fn count_tables(
+    conn: &Connection,
+    db: &str,
+    opts: &CountTablesOpts,
+) -> Result<u32, DataSourceError> {
+    if let Some(search) = &opts.search {
+        if search.contains(';') {
+            return Err(DataSourceError::Other(
+                "invalid search character: ';'".into(),
+            ));
+        }
+    }
+    let sql = match &opts.stable {
+        Some(stable) => build_count_child_tables_sql(db, stable, opts.search.as_deref()),
+        None => build_count_normal_tables_sql(db, opts.search.as_deref()),
+    };
+    let resp = execute_sql(conn, None, &sql).await?;
+    Ok(parse_scalar_count(&resp.data).unwrap_or(0))
 }
 
 pub async fn describe_table(

@@ -16,7 +16,7 @@ use crate::datasource::inflight::InFlightRegistry;
 use crate::datasource::state::Store;
 use crate::datasource::{transport, ws_client};
 use crate::datasource::types::{
-    Column, Connection, ConnectionInput, Console, CreateConsoleInput, Database,
+    Column, Connection, ConnectionInput, Console, CountTablesOpts, CreateConsoleInput, Database,
     HistoryEntry, ListTablesOpts, Paged, QueryResult, STable, Table, TestConnectionResult,
 };
 
@@ -138,6 +138,17 @@ pub async fn list_tables(
 ) -> Result<Paged<Table>, DataSourceError> {
     let conn = clone_connection(&state, &conn_id)?;
     transport::list_tables(&conn, &db, &opts).await
+}
+
+#[tauri::command]
+pub async fn count_tables(
+    state: State<'_, Mutex<Store>>,
+    conn_id: String,
+    db: String,
+    opts: CountTablesOpts,
+) -> Result<u32, DataSourceError> {
+    let conn = clone_connection(&state, &conn_id)?;
+    transport::count_tables(&conn, &db, &opts).await
 }
 
 #[tauri::command]

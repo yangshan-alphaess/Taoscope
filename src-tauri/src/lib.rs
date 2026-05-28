@@ -60,6 +60,7 @@ pub fn run() {
             commands::list_databases,
             commands::list_stables,
             commands::list_tables,
+            commands::count_tables,
             commands::describe_table,
             commands::run_sql,
             commands::cancel_query,

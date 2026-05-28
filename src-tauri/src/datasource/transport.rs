@@ -4,8 +4,8 @@
 
 use crate::datasource::error::DataSourceError;
 use crate::datasource::types::{
-    Column, Connection, Database, ListTablesOpts, Paged, QueryResult, STable, Table,
-    TestConnectionResult, Transport,
+    Column, Connection, CountTablesOpts, Database, ListTablesOpts, Paged, QueryResult, STable,
+    Table, TestConnectionResult, Transport,
 };
 use crate::datasource::{http_client, ws_client};
 
@@ -52,6 +52,17 @@ pub async fn describe_table(
     match conn.transport {
         Transport::Http => http_client::describe_table(conn, db, table).await,
         Transport::Ws => ws_client::describe_table(conn, db, table).await,
+    }
+}
+
+pub async fn count_tables(
+    conn: &Connection,
+    db: &str,
+    opts: &CountTablesOpts,
+) -> Result<u32, DataSourceError> {
+    match conn.transport {
+        Transport::Http => http_client::count_tables(conn, db, opts).await,
+        Transport::Ws => ws_client::count_tables(conn, db, opts).await,
     }
 }
 
