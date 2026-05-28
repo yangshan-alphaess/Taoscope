@@ -95,17 +95,6 @@ export function TitleBar() {
         <span className="text-foreground font-mono text-xs leading-none">
           {currentConn ? currentConn.name : "—"}
         </span>
-        {currentConn && (
-          <span
-            className={cn(
-              "inline-block h-2 w-2 rounded-full",
-              currentConn.status === "online"
-                ? "bg-primary"
-                : "bg-muted-foreground/50",
-            )}
-            aria-hidden
-          />
-        )}
       </div>
 
       {showControls && (

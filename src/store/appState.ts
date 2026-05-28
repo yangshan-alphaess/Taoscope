@@ -64,6 +64,18 @@ interface AppState {
   consoleFlashNonce: number;
   pulseActiveConsole: () => void;
 
+  /** Queued request to append a SQL snippet to the given console's editor and
+   *  immediately execute it. Picked up by the Editor once that console is
+   *  active and its runtime + EditorView are ready. The nonce lets repeated
+   *  requests for the same (consoleId, sql) re-fire. */
+  pendingAppendAndRun: {
+    consoleId: string;
+    sql: string;
+    nonce: number;
+  } | null;
+  requestAppendAndRun: (consoleId: string, sql: string) => void;
+  clearPendingAppendAndRun: () => void;
+
   consoleRuntime: Record<string, ConsoleRuntimeEntry>;
   hydrateConsoleRuntime: (
     id: string,
@@ -140,6 +152,17 @@ export const useAppState = create<AppState>((set) => ({
   consoleFlashNonce: 0,
   pulseActiveConsole: () =>
     set((state) => ({ consoleFlashNonce: state.consoleFlashNonce + 1 })),
+
+  pendingAppendAndRun: null,
+  requestAppendAndRun: (consoleId, sql) =>
+    set((state) => ({
+      pendingAppendAndRun: {
+        consoleId,
+        sql,
+        nonce: (state.pendingAppendAndRun?.nonce ?? 0) + 1,
+      },
+    })),
+  clearPendingAppendAndRun: () => set({ pendingAppendAndRun: null }),
 
   consoleRuntime: {},
   hydrateConsoleRuntime: (id, init) =>

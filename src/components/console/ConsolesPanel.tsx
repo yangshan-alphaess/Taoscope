@@ -107,13 +107,6 @@ export function ConsolesPanel() {
                       ) : (
                         <ChevronRight className="h-3 w-3 shrink-0" />
                       )}
-                      <span
-                        className={cn(
-                          "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
-                          isOffline ? "bg-muted-foreground/50" : "bg-primary",
-                        )}
-                        aria-hidden
-                      />
                       <span className="truncate font-medium">{conn.name}</span>
                       {group.length > 0 && (
                         <span className="ml-auto font-mono text-muted-foreground/70">
@@ -142,7 +135,10 @@ export function ConsolesPanel() {
                 {isOpen && (
                   <div>
                     {group.length === 0 ? (
-                      <p className="px-3 py-1 italic text-muted-foreground/60">
+                      <p
+                        style={{ paddingLeft: 24 }}
+                        className="py-1 pr-3 italic text-muted-foreground/60"
+                      >
                         {t("consoles-panel.no-consoles")}
                       </p>
                     ) : (
@@ -167,15 +163,6 @@ export function ConsolesPanel() {
                                   doFlash && "animate-attention-flash",
                                 )}
                               >
-                                <span
-                                  className={cn(
-                                    "inline-block h-1 w-1 shrink-0 rounded-full",
-                                    isActive
-                                      ? "bg-primary"
-                                      : "bg-muted-foreground/40",
-                                  )}
-                                  aria-hidden
-                                />
                                 <RenamableLabel
                                   value={c.name}
                                   startEditing={renamingId === c.id}

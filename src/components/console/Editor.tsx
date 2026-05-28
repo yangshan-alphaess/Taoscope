@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import CodeMirror from "@uiw/react-codemirror";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, placeholder } from "@codemirror/view";
@@ -36,6 +36,10 @@ export function Editor() {
   );
   const hydrateConsoleRuntime = useAppState((s) => s.hydrateConsoleRuntime);
   const setScratch = useAppState((s) => s.setScratch);
+  const pendingAppendAndRun = useAppState((s) => s.pendingAppendAndRun);
+  const clearPendingAppendAndRun = useAppState(
+    (s) => s.clearPendingAppendAndRun,
+  );
 
   const { run } = useRunActiveConsole();
   const runRef = useRef<() => void>(() => {});
@@ -70,9 +74,11 @@ export function Editor() {
   );
 
   const viewRef = useRef<EditorView | null>(null);
+  const [viewReady, setViewReady] = useState(false);
   const handleCreateEditor = (view: EditorView) => {
     viewRef.current = view;
     editorBridge.registerView(view);
+    setViewReady(true);
   };
 
   useEffect(() => {
@@ -80,6 +86,75 @@ export function Editor() {
       editorBridge.unregisterView();
     };
   }, []);
+
+  // Append-and-run handoff. Two-phase to keep CodeMirror's controlled `value`
+  // prop authoritative:
+  //   1. Once the target console is active and its scratch is hydrated, write
+  //      the new scratch into the store. This is what the editor renders, so
+  //      the appended SELECT is guaranteed to be visible — no race against
+  //      CodeMirror's internal value-reconcile effect (which would otherwise
+  //      reset a directly-dispatched doc whenever the store hadn't caught up
+  //      yet, e.g. on the very first mount of a new console).
+  //   2. Once CodeMirror has propagated the new value into the view's doc,
+  //      select the appended statement (so the run hook picks it up via the
+  //      live selection) and trigger run.
+  const [pendingSelection, setPendingSelection] = useState<{
+    consoleId: string;
+    from: number;
+    to: number;
+    expectedScratch: string;
+  } | null>(null);
+
+  // Phase 1: write scratch.
+  useEffect(() => {
+    if (!pendingAppendAndRun) return;
+    if (!activeConsoleId) return;
+    if (pendingAppendAndRun.consoleId !== activeConsoleId) return;
+    if (!runtime) return;
+    if (pendingSelection?.consoleId === activeConsoleId) return;
+    const oldScratch = runtime.scratch;
+    const needsBlankLine =
+      oldScratch.length > 0 && !/(?:^|\n)\s*$/.test(oldScratch);
+    const prefix = oldScratch.length === 0 ? "" : needsBlankLine ? "\n\n" : "";
+    const newScratch = `${oldScratch}${prefix}${pendingAppendAndRun.sql}`;
+    setPendingSelection({
+      consoleId: activeConsoleId,
+      from: oldScratch.length + prefix.length,
+      to: newScratch.length,
+      expectedScratch: newScratch,
+    });
+    setScratch(activeConsoleId, newScratch);
+    clearPendingAppendAndRun();
+  }, [
+    pendingAppendAndRun,
+    activeConsoleId,
+    runtime,
+    pendingSelection,
+    setScratch,
+    clearPendingAppendAndRun,
+  ]);
+
+  // Phase 2: select + run, once the view's doc reflects the new scratch.
+  useEffect(() => {
+    if (!pendingSelection) return;
+    if (!viewReady) return;
+    if (pendingSelection.consoleId !== activeConsoleId) {
+      setPendingSelection(null);
+      return;
+    }
+    if (!runtime) return;
+    const view = viewRef.current;
+    if (!view) return;
+    if (view.state.doc.toString() !== pendingSelection.expectedScratch) return;
+    const { from, to } = pendingSelection;
+    setPendingSelection(null);
+    view.dispatch({
+      selection: { anchor: from, head: to },
+      scrollIntoView: true,
+    });
+    view.focus();
+    runRef.current();
+  }, [pendingSelection, viewReady, activeConsoleId, runtime]);
 
   // Track which console ids have been hydration-started this session to
   // avoid double-fetching during re-renders.

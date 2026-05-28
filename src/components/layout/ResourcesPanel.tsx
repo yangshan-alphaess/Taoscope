@@ -37,7 +37,11 @@ import type {
 } from "@/datasource/types";
 import { cn } from "@/lib/utils";
 import { useCreateConsole } from "@/components/console/useCreateConsole";
-import { buildDrop, type DropKind } from "@/components/console/ddlBuilder";
+import {
+  buildDrop,
+  quoteIdent,
+  type DropKind,
+} from "@/components/console/ddlBuilder";
 import { ConnectionFormDialog } from "@/components/layout/ConnectionFormDialog";
 import { ResourcesFooter } from "@/components/layout/StatusBar";
 import {
@@ -293,6 +297,7 @@ export function ResourcesPanel() {
   );
   const resourceFocus = useAppState((s) => s.resourceFocus);
   const pulseActiveConsole = useAppState((s) => s.pulseActiveConsole);
+  const requestAppendAndRun = useAppState((s) => s.requestAppendAndRun);
   const createConsole = useCreateConsole();
 
   // Double-click a database: reuse the existing console bound to that db if
@@ -309,6 +314,26 @@ export function ResourcesPanel() {
     } else {
       void createConsole(connId, { db });
     }
+  }
+
+  // Double-click a (sub)table: reuse or create a console bound to its db
+  // (mirroring openConsoleForDb), then queue a `SELECT * FROM <table>;` to be
+  // appended to the editor and executed once the editor is ready.
+  async function openQueryForTable(connId: string, db: string, table: string) {
+    const sql = `SELECT * FROM ${quoteIdent(table)};`;
+    const existing = consoles.find(
+      (c) => c.connectionId === connId && c.currentDb === db,
+    );
+    let targetId: string;
+    if (existing) {
+      setActiveConsole(existing.id);
+      pulseActiveConsole();
+      targetId = existing.id;
+    } else {
+      const created = await createConsole(connId, { db });
+      targetId = created.id;
+    }
+    requestAppendAndRun(targetId, sql);
   }
 
   const [query, setQuery] = useState("");
@@ -1044,15 +1069,6 @@ export function ResourcesPanel() {
                           className="flex min-w-0 flex-1 items-center gap-1 py-1 pr-2"
                         >
                           <span
-                            className={cn(
-                              "inline-block h-2 w-2 shrink-0 rounded-full",
-                              isOffline
-                                ? "bg-muted-foreground/50"
-                                : "bg-primary",
-                            )}
-                            aria-hidden
-                          />
-                          <span
                             className="min-w-0 truncate font-medium"
                             title={c.name}
                           >
@@ -1109,6 +1125,9 @@ export function ResourcesPanel() {
                         void createConsole(connId, { db })
                       }
                       onOpenConsoleForDb={openConsoleForDb}
+                      onOpenQueryForTable={(connId, db, table) =>
+                        void openQueryForTable(connId, db, table)
+                      }
                       onToggleTable={toggleTable}
                       onToggleColumns={toggleColumns}
                       onToggleChildren={toggleChildren}
@@ -1173,6 +1192,7 @@ interface ConnectionBodyProps {
   onRefreshDb: (connId: string, db: string) => void;
   onCreateConsoleInDb: (connId: string, db: string) => void;
   onOpenConsoleForDb: (connId: string, db: string) => void;
+  onOpenQueryForTable: (connId: string, db: string, table: string) => void;
   onToggleTable: (connId: string, db: string, table: string) => void;
   onToggleColumns: (connId: string, db: string, table: string) => void;
   onToggleChildren: (connId: string, db: string, stable: string) => void;
@@ -1200,6 +1220,7 @@ function ConnectionBody({
   onRefreshDb,
   onCreateConsoleInDb,
   onOpenConsoleForDb,
+  onOpenQueryForTable,
   onToggleTable,
   onToggleColumns,
   onToggleChildren,
@@ -1406,6 +1427,7 @@ function ConnectionBody({
                 onRefreshColumns={onRefreshColumns}
                 onRefreshChildren={onRefreshChildren}
                 onOpenDesigner={onOpenDesigner}
+                onOpenQueryForTable={onOpenQueryForTable}
                 onDrop={onDrop}
               />
             )}
@@ -1435,6 +1457,7 @@ interface DatabaseBodyProps {
   onRefreshColumns: (connId: string, db: string, table: string) => void;
   onRefreshChildren: (connId: string, db: string, stable: string) => void;
   onOpenDesigner: (args: OpenDesignerArgs) => void;
+  onOpenQueryForTable: (connId: string, db: string, table: string) => void;
   onDrop: (args: DropArgs) => void;
 }
 
@@ -1457,6 +1480,7 @@ function DatabaseBody({
   onRefreshColumns,
   onRefreshChildren,
   onOpenDesigner,
+  onOpenQueryForTable,
   onDrop,
 }: DatabaseBodyProps) {
   const { t: tr } = useTranslation("connection");
@@ -1586,6 +1610,7 @@ function DatabaseBody({
                 onRefreshColumns={onRefreshColumns}
                 onRefreshChildren={onRefreshChildren}
                 onOpenDesigner={onOpenDesigner}
+                onOpenQueryForTable={onOpenQueryForTable}
                 onDrop={onDrop}
               />
             )}
@@ -1680,6 +1705,7 @@ function DatabaseBody({
                 onRefreshColumns={onRefreshColumns}
                 onRefreshChildren={onRefreshChildren}
                 onOpenDesigner={onOpenDesigner}
+                onOpenQueryForTable={onOpenQueryForTable}
                 onDrop={onDrop}
               />
             )}
@@ -1717,6 +1743,7 @@ interface TableBodyProps {
   onRefreshColumns: (connId: string, db: string, table: string) => void;
   onRefreshChildren: (connId: string, db: string, stable: string) => void;
   onOpenDesigner: (args: OpenDesignerArgs) => void;
+  onOpenQueryForTable: (connId: string, db: string, table: string) => void;
   onDrop: (args: DropArgs) => void;
 }
 
@@ -1739,6 +1766,7 @@ function TableBody({
   onRefreshColumns,
   onRefreshChildren,
   onOpenDesigner,
+  onOpenQueryForTable,
   onDrop,
 }: TableBodyProps) {
   const { t } = useTranslation("connection");
@@ -1872,6 +1900,7 @@ function TableBody({
               stableName={tableName}
               onLoadMore={() => onLoadMoreChildren(connId, dbName, tableName)}
               onOpenDesigner={onOpenDesigner}
+              onOpenQueryForTable={onOpenQueryForTable}
               onDrop={onDrop}
             />
           )}
@@ -1969,6 +1998,7 @@ function ChildrenList({
   stableName,
   onLoadMore,
   onOpenDesigner,
+  onOpenQueryForTable,
   onDrop,
 }: {
   state: ChildLoadState | undefined;
@@ -1978,6 +2008,7 @@ function ChildrenList({
   stableName: string;
   onLoadMore: () => void;
   onOpenDesigner: (args: OpenDesignerArgs) => void;
+  onOpenQueryForTable: (connId: string, db: string, table: string) => void;
   onDrop: (args: DropArgs) => void;
 }) {
   const { t: tr } = useTranslation("connection");
@@ -2030,6 +2061,7 @@ function ChildrenList({
             <ContextMenuTrigger asChild>
               <div
                 onClick={() => select(childKey)}
+                onDoubleClick={() => onOpenQueryForTable(connId, dbName, t.name)}
                 style={indentStyle(4)}
                 className={cn(
                   "mx-1 flex items-center gap-2 rounded-md py-0.5 pr-2",

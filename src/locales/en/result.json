@@ -7,6 +7,22 @@
     "no-rows": "No rows.",
     "no-rows-filtered": "No rows match the current filter."
   },
+  "view-tabs": {
+    "table": "Table",
+    "chart": "Chart"
+  },
+  "chart": {
+    "placeholder": "Chart area (not yet implemented)",
+    "axes-summary": "X: {{x}} · Y: {{y}}",
+    "no-time-column": "No time column detected; cannot plot",
+    "settings": {
+      "title": "Settings",
+      "x-axis": "X axis (primary timestamp)",
+      "x-axis-unavailable": "No time column available",
+      "y-axis": "Y axis",
+      "y-axis-empty": "No numeric columns in the current result"
+    }
+  },
   "error": {
     "timeout": "Query timed out after {{seconds}}s. Adjust the timeout in connection settings.",
     "cancelled": "Query was cancelled.",

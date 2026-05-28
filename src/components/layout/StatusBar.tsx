@@ -59,7 +59,7 @@ export function ResultStatsPill() {
   if (!text) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[17px] flex justify-center">
       <div className="bg-background/80 border-border text-muted-foreground pointer-events-auto rounded-full border px-3 py-1 font-mono text-xs shadow-md backdrop-blur">
         {text}
       </div>

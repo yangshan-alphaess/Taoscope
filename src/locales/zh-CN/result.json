@@ -7,6 +7,22 @@
     "no-rows": "无数据行。",
     "no-rows-filtered": "无数据行匹配当前过滤条件。"
   },
+  "view-tabs": {
+    "table": "表格",
+    "chart": "图表"
+  },
+  "chart": {
+    "placeholder": "图表区域（待实现）",
+    "axes-summary": "X: {{x}} · Y: {{y}}",
+    "no-time-column": "未检测到时间列，无法绘制",
+    "settings": {
+      "title": "设置",
+      "x-axis": "X 轴（时间主键）",
+      "x-axis-unavailable": "无可用时间列",
+      "y-axis": "Y 轴",
+      "y-axis-empty": "当前结果没有可绘制的数值列"
+    }
+  },
   "error": {
     "timeout": "查询超时（{{seconds}} 秒）。请在连接设置中调整超时。",
     "cancelled": "查询已取消。",
