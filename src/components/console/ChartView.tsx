@@ -264,17 +264,49 @@ export function ChartView({ result }: { result: QueryResult }) {
     }
   }, [result, xColumn, yColumns]);
 
+  // Remember which result we last rendered, so a Y-checkbox change
+  // (same data, new series list) can carry the user's current dataZoom
+  // window forward — while a brand-new query still resets to 0–100%.
+  const lastRenderedResultRef = useRef<typeof result | null>(null);
+
   useEffect(() => {
     const inst = chartRef.current;
     if (!inst) return;
-    if (option) {
-      // notMerge: replace the previous option entirely so removed Y series
-      // don't linger as ghost lines after a column is unchecked.
-      inst.setOption(option, true);
-    } else {
+    if (!option) {
       inst.clear();
+      lastRenderedResultRef.current = null;
+      return;
     }
-  }, [option]);
+    const sameQuery = lastRenderedResultRef.current === result;
+    let toApply: typeof option = option;
+    if (sameQuery) {
+      // Read the live dataZoom range and splice it into the new option
+      // so the time axis doesn't reset when the user toggles a Y series.
+      const live = inst.getOption() as {
+        dataZoom?: Array<{ start?: number; end?: number }>;
+      };
+      const curDz = live.dataZoom?.[0];
+      if (curDz && option.dataZoom) {
+        toApply = {
+          ...option,
+          dataZoom: option.dataZoom.map((dz) => ({
+            ...dz,
+            start: curDz.start,
+            end: curDz.end,
+          })),
+        } as typeof option;
+      }
+    }
+    // `replaceMerge: ['series', 'yAxis']` fully replaces those arrays so
+    // unchecked series don't linger as ghost lines and the yAxis flip
+    // between single and dual mode applies cleanly — while leaving the
+    // dataZoom component's internal state intact for the merge path.
+    inst.setOption(toApply, {
+      notMerge: false,
+      replaceMerge: ["series", "yAxis"],
+    });
+    lastRenderedResultRef.current = result;
+  }, [option, result]);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
