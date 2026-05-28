@@ -10,6 +10,10 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
   <img src="docs/images/ui.png" alt="Taoscope main window" width="900">
 </p>
 
+<p align="center">
+  <img src="docs/images/ui-chart.png" alt="Taoscope main window" width="900">
+</p>
+
 ## Features
 
 ### Connections & resources
@@ -17,6 +21,7 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
 - **Multi-connection workspace** — manage many TDengine clusters side by side, online/offline indicators, per-connection refresh. **HTTP REST or native WebSocket** transport, **Basic or token** auth, optional TLS (with allow-invalid-certs escape hatch).
 - **Visual table designer** — right-click in the tree to create databases / super tables / tables / child tables, edit columns & tags, or drop objects; the exact SQL is previewed live below the form before you run it.
 - **Tree-style resources panel** — Connection → Database → STable / Table → inline **Columns & tags** + **Child tables**, each with a unified `⋯` / right-click action menu. Deleting a connection cascades to its consoles + saved state. Expansion state persists across reloads.
+- **Double-click a sub-table** to open (or reuse) a console bound to its database and auto-append + execute `SELECT * FROM <child>;` — zero typing for a quick peek at a child table's rows.
 - **Schema cache** — keystroke-driven completions don't hammer the backend.
 
 ### SQL console
@@ -32,9 +37,14 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
 
 ### Results
 
-- **Virtualized grid** (TanStack Table + Virtual) — millions of rows scroll smooth.
+- **Table / Chart toggle** — every result set is browsable as a virtualized grid **or** plotted as a line chart, sharing the exact same in-memory rows (no extra round-trip). Switch via the floating capsule rail that visually columns up with the editor's line-number gutter above.
+- **Virtualized grid** (TanStack Table + Virtual) — millions of rows scroll smooth; per-row context menu (Copy value / row TSV / row JSON / column name) consolidated for low scroll cost.
 - **Sortable / resizable columns**, per-column copy of names or values, **CSV** + **JSON** export.
 - **Inline filter** across all columns.
+- **Smart line chart** — X axis locks to the primary timestamp; Y candidates are auto-scored by type (FLOAT/DOUBLE preferred), value variation, non-null density, and name hints (`temp|humid|volt|count|...` boosted, `id|seq|idx` demoted) so the most-likely business metric is pre-checked. Multi-select more from the settings popover for layered series.
+- **String-typed numeric columns are accepted** (TDengine BIGINT often arrives JSON-serialized as a string) — values are parsed defensively per cell so a stray non-numeric value just drops the column, never crashes the analyzer.
+- **Dual Y-axis** kicks in automatically when selected series differ by >10× in magnitude (e.g. a small temperature curve alongside a BIGINT counter) — small-range metrics stay readable instead of being squashed flat.
+- **Cursor-anchored time zoom** — wheel/trackpad zoom anchors on the cursor's x-position and is tuned for Mac trackpad sensitivity (echarts' default zoom factor felt runaway on multi-event swipes). The dataZoom slider at the bottom is always available too.
 - **Empty state** still shows the schema headers so you know what the query would have returned.
 - **Per-console history** (last 50 queries), persisted to local SQLite.
 
