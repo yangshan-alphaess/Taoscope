@@ -19,6 +19,10 @@
   <img src="docs/images/ui.png" alt="Taoscope 主窗口" width="900">
 </p>
 
+<p align="center">
+  <img src="docs/images/ui-chart.png" alt="Taoscope 折线图视图" width="900">
+</p>
+
 ## 功能
 
 ### 连接与资源
