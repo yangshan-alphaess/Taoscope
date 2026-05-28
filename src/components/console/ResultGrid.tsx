@@ -20,8 +20,8 @@ import { useTranslation } from "react-i18next";
 import type { Column, QueryResult } from "@/datasource/types";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/store/appState";
-import { formatCell, isNumericColumn } from "@/components/console/formatCell";
-import { ResultCell } from "@/components/console/ResultCell";
+import { formatCell } from "@/components/console/formatCell";
+import { ResultRow } from "@/components/console/ResultRow";
 import { columnToText, serializeValue } from "@/components/console/resultExport";
 import {
   ContextMenu,
@@ -169,7 +169,11 @@ export function ResultGrid({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     enableColumnResizing: true,
-    columnResizeMode: "onChange",
+    // `onEnd` instead of `onChange`: avoids a zustand write + full-grid
+    // re-render on every pixel of column-resize drag. The column header
+    // still visibly tracks the drag (TanStack handles that locally); the
+    // store / virtualizer only see the final width on mouse-up.
+    columnResizeMode: "onEnd",
     globalFilterFn,
     state: {
       sorting: gridState.sorting,
@@ -194,7 +198,10 @@ export function ResultGrid({
     count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 28,
-    overscan: 8,
+    // 4 instead of 8: each mounted row spins up a Radix ContextMenu Root;
+    // a tighter overscan halves the number of those that exist at any
+    // moment without producing visible blank rows during normal scrolling.
+    overscan: 4,
   });
 
   const totalWidth = table.getCenterTotalSize();
@@ -352,39 +359,14 @@ export function ResultGrid({
             const row = rows[vRow.index];
             if (!row) return null;
             return (
-              <tr
+              <ResultRow
                 key={row.id}
-                className={cn(
-                  "border-border/50 border-b hover:bg-muted/30",
-                  vRow.index % 2 === 1 && "bg-foreground/[0.03]",
-                )}
-                style={{
-                  display: "flex",
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  transform: `translateY(${vRow.start}px)`,
-                  height: 28,
-                  width: totalWidth,
-                }}
-              >
-                {row.getVisibleCells().map((cell) => {
-                  const col = result.columns.find(
-                    (c) => c.name === cell.column.id,
-                  );
-                  const numeric = col ? isNumericColumn(col) : false;
-                  return (
-                    <ResultCell
-                      key={cell.id}
-                      cell={cell}
-                      col={col}
-                      row={row.original}
-                      columns={result.columns}
-                      numeric={numeric}
-                    />
-                  );
-                })}
-              </tr>
+                row={row}
+                columns={result.columns}
+                totalWidth={totalWidth}
+                translateY={vRow.start}
+                zebra={vRow.index % 2 === 1}
+              />
             );
           })}
         </tbody>
