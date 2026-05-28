@@ -125,9 +125,46 @@ pub fn forget(conn_id: &str) {
 // ── Value conversion ────────────────────────────────────────────────────
 
 fn taos_value_to_json(v: TaosValue) -> JsonValue {
-    // `taos_query::common::Value` derives Serialize, so serde_json::to_value
-    // gives us a stable JSON representation that mirrors the REST envelope.
-    serde_json::to_value(v).unwrap_or(JsonValue::Null)
+    // `taos_query::common::Value` derives the default externally-tagged
+    // Serialize impl, so `serde_json::to_value` would wrap scalars in
+    // `{"VarChar": "..."}` envelopes. Unwrap to bare JSON scalars so the
+    // ws transport matches the REST envelope shape.
+    use serde_json::Number;
+    match v {
+        TaosValue::Null(_) => JsonValue::Null,
+        TaosValue::Bool(b) => JsonValue::Bool(b),
+        TaosValue::TinyInt(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::SmallInt(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::Int(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::BigInt(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::UTinyInt(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::USmallInt(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::UInt(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::UBigInt(n) => JsonValue::Number(Number::from(n)),
+        TaosValue::Float(f) => Number::from_f64(f as f64)
+            .map(JsonValue::Number)
+            .unwrap_or(JsonValue::Null),
+        TaosValue::Double(f) => Number::from_f64(f)
+            .map(JsonValue::Number)
+            .unwrap_or(JsonValue::Null),
+        TaosValue::VarChar(s) => JsonValue::String(s),
+        TaosValue::NChar(s) => JsonValue::String(s),
+        TaosValue::Timestamp(ts) => JsonValue::Number(Number::from(ts.as_raw_i64())),
+        TaosValue::Json(j) => j,
+        TaosValue::VarBinary(b) => JsonValue::String(hex_encode(&b)),
+        TaosValue::Geometry(b) => JsonValue::String(hex_encode(&b)),
+        TaosValue::Blob(b) => JsonValue::String(hex_encode(&b)),
+        TaosValue::MediumBlob(b) => JsonValue::String(hex_encode(&b)),
+        TaosValue::Decimal(d) => JsonValue::String(d.to_string()),
+    }
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
 }
 
 struct ResultRows {
