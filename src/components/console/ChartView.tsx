@@ -61,13 +61,59 @@ export function ChartView({ result }: { result: QueryResult }) {
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
 
   useEffect(() => {
-    const host = chartHostRef.current;
+    const host: HTMLDivElement | null = chartHostRef.current;
     if (!host) return;
+    const hostEl: HTMLDivElement = host;
     const inst = echarts.init(host, undefined, { renderer: "canvas" });
     chartRef.current = inst;
     const ro = new ResizeObserver(() => inst.resize());
     ro.observe(host);
+
+    // Custom wheel-to-zoom. echarts' built-in inside-zoom uses a hard-
+    // coded zoom factor per wheel tick (~1.05), which feels fine for a
+    // real scroll-wheel but is overwhelmingly aggressive on Mac trackpads
+    // where one gesture can produce dozens of small deltaY events. We
+    // disable the default (zoomOnMouseWheel: false in the option) and
+    // implement our own that scales the zoom step linearly with deltaY,
+    // tuned via a single knob.
+    const ZOOM_SENSITIVITY = 0.0008;
+    function onWheel(e: WheelEvent) {
+      // Only intercept vertical wheels; horizontal swipes (deltaX) are
+      // ignored so two-finger horizontal scrolls don't accidentally zoom.
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      const opt = inst.getOption() as {
+        dataZoom?: Array<{ start?: number; end?: number }>;
+      };
+      const dz = opt.dataZoom?.[0];
+      if (!dz) return;
+      const start = dz.start ?? 0;
+      const end = dz.end ?? 100;
+      const span = end - start;
+      if (span <= 0) return;
+      // Zoom toward the cursor's x position so the user-visible point
+      // under the pointer stays put — matches how map/chart UIs feel.
+      const rect = hostEl.getBoundingClientRect();
+      const xRatio =
+        rect.width > 0
+          ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+          : 0.5;
+      const focus = start + span * xRatio;
+      // deltaY > 0 (scroll down) → zoom out; deltaY < 0 → zoom in.
+      const factor = 1 + e.deltaY * ZOOM_SENSITIVITY;
+      const newSpan = Math.max(0.1, Math.min(100, span * factor));
+      const rawStart = focus - (focus - start) * (newSpan / span);
+      const newStart = Math.max(0, Math.min(100 - newSpan, rawStart));
+      inst.dispatchAction({
+        type: "dataZoom",
+        start: newStart,
+        end: newStart + newSpan,
+      });
+    }
+    hostEl.addEventListener("wheel", onWheel, { passive: false });
+
     return () => {
+      hostEl.removeEventListener("wheel", onWheel);
       ro.disconnect();
       inst.dispose();
       chartRef.current = null;
@@ -194,6 +240,10 @@ export function ChartView({ result }: { result: QueryResult }) {
           {
             type: "inside",
             throttle: 50,
+            // We replace the default wheel-zoom with a sensitivity-tuned
+            // handler attached on the chart host (see init useEffect).
+            // Mouse-drag panning inside the grid remains via this entry.
+            zoomOnMouseWheel: false,
           },
           {
             type: "slider",
