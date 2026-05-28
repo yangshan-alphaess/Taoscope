@@ -15,6 +15,7 @@
     "placeholder": "图表区域（待实现）",
     "axes-summary": "X: {{x}} · Y: {{y}}",
     "no-time-column": "未检测到时间列，无法绘制",
+    "no-y-selected": "请在设置中勾选至少一个 Y 轴字段",
     "settings": {
       "title": "设置",
       "x-axis": "X 轴（时间主键）",

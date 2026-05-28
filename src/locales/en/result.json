@@ -15,6 +15,7 @@
     "placeholder": "Chart area (not yet implemented)",
     "axes-summary": "X: {{x}} · Y: {{y}}",
     "no-time-column": "No time column detected; cannot plot",
+    "no-y-selected": "Pick at least one Y column in Settings",
     "settings": {
       "title": "Settings",
       "x-axis": "X axis (primary timestamp)",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Settings2 } from "lucide-react";
 
@@ -10,23 +10,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-
-const NUMERIC_TYPES = new Set([
-  "INT",
-  "BIGINT",
-  "SMALLINT",
-  "TINYINT",
-  "INT UNSIGNED",
-  "BIGINT UNSIGNED",
-  "SMALLINT UNSIGNED",
-  "TINYINT UNSIGNED",
-  "FLOAT",
-  "DOUBLE",
-]);
-
-function isNumeric(col: Column): boolean {
-  return NUMERIC_TYPES.has(col.type);
-}
+import {
+  analyzeYCandidates,
+  buildSeriesPoints,
+} from "@/components/console/chartAnalyzer";
+import {
+  echarts,
+  readCssHsl,
+  SERIES_PALETTE,
+} from "@/components/console/chartTheme";
 
 function findXAxisColumn(cols: Column[]): Column | null {
   return (
@@ -40,24 +32,199 @@ export function ChartView({ result }: { result: QueryResult }) {
   const { t } = useTranslation("result");
 
   const xColumn = useMemo(() => findXAxisColumn(result.columns), [result]);
-  const numericColumns = useMemo(
-    () => result.columns.filter(isNumeric),
-    [result],
-  );
+  // Y candidates are the best-scoring "looks-like-a-metric" columns. The
+  // analyzer is value-aware: a string column whose cells all parse as
+  // numbers still qualifies (BIGINT often arrives serialized as a string),
+  // while a numeric-typed column with any non-numeric string value drops
+  // out. See chartAnalyzer.ts for the full heuristic.
+  const yCandidates = useMemo(() => analyzeYCandidates(result), [result]);
 
-  // Default Y selection: first numeric column. Reset whenever the underlying
-  // result changes so stale column names don't linger after a different query.
+  // Default Y selection: top-scoring candidate. Resets when the result
+  // changes so stale column names don't linger after a different query.
   const [yColumns, setYColumns] = useState<string[]>([]);
   useEffect(() => {
-    const first = numericColumns[0]?.name;
+    const first = yCandidates[0]?.column.name;
     setYColumns(first ? [first] : []);
-  }, [numericColumns]);
+  }, [yCandidates]);
 
   function toggleY(name: string) {
     setYColumns((prev) =>
       prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
     );
   }
+
+  // Chart instance lifecycle. We init lazily on first mount, dispose on
+  // unmount, and re-set the option whenever the data, X, or Y selection
+  // changes. A ResizeObserver keeps the chart fitting its container when
+  // panels resize or the user toggles between Table/Chart views.
+  const chartHostRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
+
+  useEffect(() => {
+    const host = chartHostRef.current;
+    if (!host) return;
+    const inst = echarts.init(host, undefined, { renderer: "canvas" });
+    chartRef.current = inst;
+    const ro = new ResizeObserver(() => inst.resize());
+    ro.observe(host);
+    return () => {
+      ro.disconnect();
+      inst.dispose();
+      chartRef.current = null;
+    };
+  }, []);
+
+  // Compose the echarts option. Wrapped in useMemo + try/catch so a
+  // surprise row shape never crashes the panel — worst case, an empty
+  // option clears the chart but the toolbar stays intact.
+  const option = useMemo(() => {
+    try {
+      if (!xColumn || yColumns.length === 0) return null;
+      const fg = readCssHsl("--foreground", "#e6e7eb");
+      const muted = readCssHsl("--muted-foreground", "#c2c4cb");
+      const border = readCssHsl("--border", "#3b3d44");
+
+      // Build series + per-series magnitude. When ≥2 series differ by >10x
+      // in max absolute value, split the chart into dual Y axes (small on
+      // left, big on right) so small-range metrics like a temperature
+      // don't get squashed flat by a BIGINT counter alongside.
+      const seriesData = yColumns.map((yName) =>
+        buildSeriesPoints(result, xColumn.name, yName),
+      );
+      const maxes = seriesData.map((pts) => {
+        let m = 0;
+        for (const [, y] of pts) {
+          const a = Math.abs(y);
+          if (a > m) m = a;
+        }
+        return m;
+      });
+      let yAxisAssignments = yColumns.map(() => 0);
+      let useDualAxis = false;
+      if (yColumns.length >= 2) {
+        const sorted = maxes
+          .map((m, i) => ({ m, i }))
+          .sort((a, b) => a.m - b.m);
+        let bestRatio = 1;
+        let splitAt = -1;
+        for (let k = 1; k < sorted.length; k++) {
+          const prev = sorted[k - 1]!.m;
+          const cur = sorted[k]!.m;
+          const ratio = cur / Math.max(prev, 1e-12);
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            splitAt = k;
+          }
+        }
+        if (bestRatio > 10 && splitAt > 0) {
+          useDualAxis = true;
+          const bigGroup = new Set(
+            sorted.slice(splitAt).map((x) => x.i),
+          );
+          yAxisAssignments = yColumns.map((_, i) =>
+            bigGroup.has(i) ? 1 : 0,
+          );
+        }
+      }
+      const series = yColumns.map((yName, i) => ({
+        name: yName,
+        type: "line" as const,
+        showSymbol: false,
+        smooth: true,
+        sampling: "lttb" as const,
+        connectNulls: false,
+        lineStyle: { width: 1.5 },
+        emphasis: { focus: "series" as const },
+        data: seriesData[i] ?? [],
+        color: SERIES_PALETTE[i % SERIES_PALETTE.length],
+        yAxisIndex: yAxisAssignments[i] ?? 0,
+      }));
+      const yAxisStyle = {
+        type: "value" as const,
+        scale: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: muted },
+        splitLine: { lineStyle: { color: border, opacity: 0.35 } },
+      };
+      const yAxisDef = useDualAxis
+        ? [
+            { ...yAxisStyle, position: "left" as const },
+            {
+              ...yAxisStyle,
+              position: "right" as const,
+              splitLine: { show: false },
+            },
+          ]
+        : yAxisStyle;
+      return {
+        animation: false,
+        color: SERIES_PALETTE,
+        backgroundColor: "transparent",
+        textStyle: { color: fg, fontFamily: "inherit", fontSize: 11 },
+        grid: {
+          top: 28,
+          right: useDualAxis ? 60 : 18,
+          bottom: 44,
+          left: 52,
+        },
+        legend: {
+          top: 4,
+          right: 12,
+          textStyle: { color: muted, fontSize: 11 },
+          icon: "roundRect",
+          itemWidth: 10,
+          itemHeight: 6,
+        },
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "cross", lineStyle: { color: border } },
+          backgroundColor: "rgba(20,22,26,0.92)",
+          borderColor: border,
+          textStyle: { color: fg, fontSize: 11 },
+        },
+        xAxis: {
+          type: "time",
+          axisLine: { lineStyle: { color: border } },
+          axisLabel: { color: muted, hideOverlap: true },
+          splitLine: { show: false },
+        },
+        yAxis: yAxisDef,
+        dataZoom: [
+          {
+            type: "inside",
+            throttle: 50,
+          },
+          {
+            type: "slider",
+            height: 16,
+            bottom: 8,
+            borderColor: "transparent",
+            backgroundColor: "transparent",
+            fillerColor: "rgba(6,167,125,0.18)",
+            handleStyle: { color: SERIES_PALETTE[0] },
+            moveHandleStyle: { color: SERIES_PALETTE[0], opacity: 0.6 },
+            textStyle: { color: muted, fontSize: 10 },
+          },
+        ],
+        series,
+      };
+    } catch {
+      return null;
+    }
+  }, [result, xColumn, yColumns]);
+
+  useEffect(() => {
+    const inst = chartRef.current;
+    if (!inst) return;
+    if (option) {
+      // notMerge: replace the previous option entirely so removed Y series
+      // don't linger as ghost lines after a column is unchecked.
+      inst.setOption(option, true);
+    } else {
+      inst.clear();
+    }
+  }, [option]);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
@@ -89,13 +256,13 @@ export function ChartView({ result }: { result: QueryResult }) {
                 <p className="text-muted-foreground mb-1 font-medium">
                   {t("chart.settings.y-axis")}
                 </p>
-                {numericColumns.length === 0 ? (
+                {yCandidates.length === 0 ? (
                   <p className="text-muted-foreground/70 italic">
                     {t("chart.settings.y-axis-empty")}
                   </p>
                 ) : (
                   <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
-                    {numericColumns.map((col) => {
+                    {yCandidates.map(({ column: col }) => {
                       const checked = yColumns.includes(col.name);
                       return (
                         <label
@@ -131,10 +298,17 @@ export function ChartView({ result }: { result: QueryResult }) {
             : t("chart.no-time-column")}
         </span>
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center px-4">
-        <p className="text-muted-foreground/60 text-xs">
-          {t("chart.placeholder")}
-        </p>
+      <div className="relative flex min-h-0 flex-1">
+        <div ref={chartHostRef} className="absolute inset-0" />
+        {(!xColumn || yColumns.length === 0) && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
+            <p className="text-muted-foreground/60 text-xs">
+              {!xColumn
+                ? t("chart.no-time-column")
+                : t("chart.no-y-selected")}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
