@@ -234,7 +234,11 @@ export function ResultPanel() {
       <div className="border-border my-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border">
         {body}
       </div>
-      <ResultStatsPill />
+      {/* Stats pill floats over the body. Hidden in Chart view because
+          the chart canvas has no scroll affordance to dodge it — the
+          pill would permanently sit over the lines and the bottom-axis
+          tick labels. Table view scrolls, so it's not a problem there. */}
+      {view !== "chart" && <ResultStatsPill />}
     </div>
   );
 }
