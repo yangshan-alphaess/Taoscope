@@ -73,7 +73,7 @@
 
 ## 安装使用
 
-每个发版的预编译包都在 [Releases 页面](https://github.com/yangshan-alphaess/Taoscope/releases/latest)。
+每个发版的预编译包都在 [Releases 页面](https://github.com/cnsanxs/Taoscope/releases/latest)。
 
 | 平台 | 文件 | 首次安装 |
 | --- | --- | --- |

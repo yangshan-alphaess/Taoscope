@@ -8,7 +8,7 @@ import { useAppState } from "@/store/appState";
 import { openExternal } from "@/lib/openExternal";
 import { cn } from "@/lib/utils";
 
-const REPO_URL = "https://github.com/yangshan-alphaess/Taoscope";
+const REPO_URL = "https://github.com/cnsanxs/Taoscope";
 
 // __APP_VERSION__ is injected by Vite (see vite.config.ts) at build time from
 // package.json so a stale hard-coded value can't drift out of sync.

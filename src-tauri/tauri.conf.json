@@ -40,7 +40,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/yangshan-alphaess/Taoscope/releases/latest/download/latest.json"
+        "https://github.com/cnsanxs/Taoscope/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ2NUZBQjEyRDM5RUM1NkIKUldScnhaN1RFcXRmMWhEU1QrTTV0MlEyV3kzTGxxd1dZYjlkWlhPNEJVekptVzU1ekRsTk52K3IK",
       "dialog": false

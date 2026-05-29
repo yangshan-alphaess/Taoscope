@@ -73,7 +73,7 @@ Built on Tauri 2 (Rust shell) + React 18 — a small, native binary that connect
 
 ## Installation
 
-Pre-built binaries are published on the [Releases page](https://github.com/yangshan-alphaess/Taoscope/releases/latest) for every tagged version.
+Pre-built binaries are published on the [Releases page](https://github.com/cnsanxs/Taoscope/releases/latest) for every tagged version.
 
 | Platform | Asset | First-time setup |
 | --- | --- | --- |
